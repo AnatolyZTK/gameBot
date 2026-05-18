@@ -1,0 +1,7 @@
+flysystem:
+    storages:
+        default.storage:
+            aws:
+                client: s3
+                bucket: '%env(S3_BUCKET)%'
+                prefix: ''

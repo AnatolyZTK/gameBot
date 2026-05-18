@@ -1,0 +1,55 @@
+parameters:
+    env(MANTICORE_HOST): 'manticore'
+    env(MANTICORE_PORT): '9308'
+    env(S3_ENDPOINT): ''
+    env(S3_REGION): 'us-east-1'
+    env(S3_BUCKET): 'app-storage'
+    env(S3_ACCESS_KEY): ''
+    env(S3_SECRET_KEY): ''
+    env(S3_USE_PATH_STYLE): 'true'
+    env(GAME_SITE_BASE_URL): ''
+    env(GAME_SITE_REQUEST_DELAY_MS): '1500'
+    env(GAME_SITE_MAX_RETRIES): '3'
+
+    app.manticore.host: '%env(MANTICORE_HOST)%'
+    app.manticore.port: '%env(int:MANTICORE_PORT)%'
+    app.s3.bucket: '%env(S3_BUCKET)%'
+    app.game_site.base_url: '%env(GAME_SITE_BASE_URL)%'
+    app.game_site.request_delay_ms: '%env(int:GAME_SITE_REQUEST_DELAY_MS)%'
+    app.game_site.max_retries: '%env(int:GAME_SITE_MAX_RETRIES)%'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/Domain/**/Event/'
+            - '../src/Kernel.php'
+
+    App\Infrastructure\Browser\HttpBrowserClient:
+        arguments:
+            $baseUrl: '%app.game_site.base_url%'
+            $requestDelayMs: '%app.game_site.request_delay_ms%'
+            $maxRetries: '%app.game_site.max_retries%'
+
+    App\Infrastructure\Search\Manticore\ManticoreClientFactory:
+        arguments:
+            $host: '%app.manticore.host%'
+            $port: '%app.manticore.port%'
+
+    Manticoresearch\Client:
+        factory: ['@App\Infrastructure\Search\Manticore\ManticoreClientFactory', 'create']
+
+    App\Infrastructure\Storage\S3\ScreenshotStorage:
+        arguments:
+            $bucket: '%app.s3.bucket%'
+
+    App\Domain\Scraping\Contract\BrowserClientInterface: '@App\Infrastructure\Browser\HttpBrowserClient'
+    App\Domain\Scraping\Contract\PageParserInterface: '@App\Infrastructure\Parser\GameSitePageParser'
+
+    App\Application\Scraping\UseCase\ScrapeCatalogUseCase:
+        arguments:
+            $logger: '@monolog.logger.scraping'

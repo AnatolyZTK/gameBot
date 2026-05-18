@@ -1,0 +1,10 @@
+# Скопируйте: cp docker-compose.override.yml.example docker-compose.override.yml
+
+services:
+  php:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  nginx:
+    ports:
+      - "8080:80"

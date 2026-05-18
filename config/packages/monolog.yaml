@@ -1,0 +1,34 @@
+monolog:
+    channels:
+        - scraping
+
+when@dev:
+    monolog:
+        handlers:
+            main:
+                type: stream
+                path: '%kernel.logs_dir%/%kernel.environment%.log'
+                level: debug
+                channels: ['!event']
+            scraping:
+                type: stream
+                path: '%kernel.logs_dir%/scraping.log'
+                level: debug
+                channels: [scraping]
+
+when@prod:
+    monolog:
+        handlers:
+            main:
+                type: fingers_crossed
+                action_level: error
+                handler: nested
+            nested:
+                type: stream
+                path: php://stderr
+                level: debug
+            scraping:
+                type: stream
+                path: php://stderr
+                level: info
+                channels: [scraping]

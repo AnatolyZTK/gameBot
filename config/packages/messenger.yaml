@@ -1,0 +1,17 @@
+framework:
+    messenger:
+        failure_transport: failed
+
+        transports:
+            async:
+                dsn: '%env(REDIS_URL)%/messages'
+                retry_strategy:
+                    max_retries: 3
+                    delay: 2000
+                    multiplier: 2
+            failed:
+                dsn: '%env(REDIS_URL)%/failed'
+
+        routing:
+            App\Application\Scraping\Message\ScrapePageMessage: async
+            App\Application\Scraping\Message\ProcessParsedDataMessage: async
