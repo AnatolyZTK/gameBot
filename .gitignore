@@ -1,0 +1,49 @@
+/.env.local
+/.env.local.php
+/.env.*.local
+/config/secrets/prod/prod.decrypt.private.php
+/public/bundles/
+/var/
+/vendor/
+.phpunit.result.cache
+.phpunit.cache
+/docker-compose.override.yml
+
+###> symfony/framework-bundle ###
+/.env.local
+/.env.local.php
+/.env.*.local
+/config/secrets/prod/prod.decrypt.private.php
+/public/bundles/
+/var/
+/vendor/
+.idea/
+###< symfony/framework-bundle ###
+
+###> phpunit/phpunit ###
+/phpunit.xml
+/.phpunit.cache/
+###< phpunit/phpunit ###
+
+###> symfony/phpunit-bridge ###
+.phpunit.result.cache
+/phpunit.xml
+###< symfony/phpunit-bridge ###
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Symfony
+/var/
+/vendor/
+.env.local
+.env.local.php
+.phpunit.result.cache
+
+# Docker
+docker-compose.override.yml
+
+# Node
+node_modules/
+/public/build/
