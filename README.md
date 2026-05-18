@@ -1,5 +1,5 @@
 Запуск
-cd "/home/anatoly/Рабочий стол/папка"
+cd ..
 make install    # build + up + composer + migrate
 # или по шагам:
 docker compose up -d
