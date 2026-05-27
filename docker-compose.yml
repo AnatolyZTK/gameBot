@@ -1,5 +1,13 @@
 name: gameparser
 
+x-panther-env: &panther-env
+  HOME: /tmp
+  XDG_CONFIG_HOME: /tmp/.chromium
+  XDG_CACHE_HOME: /tmp/.chromium
+  PANTHER_NO_SANDBOX: "1"
+  PANTHER_CHROME_ARGUMENTS: "--disable-dev-shm-usage --disable-gpu --user-data-dir=/tmp/panther-user --crash-dumps-dir=/tmp/panther-crashes"
+  PANTHER_ERROR_SCREENSHOT_DIR: /tmp/panther-error-screenshots
+
 services:
   nginx:
     image: nginx:1.27-alpine
@@ -18,10 +26,12 @@ services:
       context: .
       dockerfile: docker/php/Dockerfile
       target: dev
+    shm_size: "2gb"
     volumes:
       - ./:/var/www/html
       - ./docker/php/conf.d/app.ini:/usr/local/etc/php/conf.d/99-app.ini:ro
     environment:
+      <<: *panther-env
       APP_ENV: ${APP_ENV:-dev}
       APP_SECRET: ${APP_SECRET:-change_me_in_production}
       DATABASE_URL: mysql://${MYSQL_USER:-app}:${MYSQL_PASSWORD:-app}@mysql:3306/${MYSQL_DATABASE:-app}?serverVersion=8.4
@@ -51,11 +61,13 @@ services:
       context: .
       dockerfile: docker/php/Dockerfile
       target: dev
+    shm_size: "2gb"
     command: ["php", "bin/console", "messenger:consume", "async", "-vv", "--time-limit=3600", "--memory-limit=256M"]
     volumes:
       - ./:/var/www/html
       - ./docker/php/conf.d/app.ini:/usr/local/etc/php/conf.d/99-app.ini:ro
     environment:
+      <<: *panther-env
       APP_ENV: ${APP_ENV:-dev}
       APP_SECRET: ${APP_SECRET:-change_me_in_production}
       DATABASE_URL: mysql://${MYSQL_USER:-app}:${MYSQL_PASSWORD:-app}@mysql:3306/${MYSQL_DATABASE:-app}?serverVersion=8.4
