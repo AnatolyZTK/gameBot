@@ -65,6 +65,12 @@
         </div>
         <div class="window-content">
             <p>Страница отрендерена через Twig.</p>
+            <p style="margin-top:10px;">URL: {{ targetUrl }}</p>
+            {% if jsResult %}
+                <p style="margin-top:10px;">JS title: {{ jsResult.title }}</p>
+                <p>JS readyState: {{ jsResult.readyState }}</p>
+                <p>JS webdriver: {{ jsResult.webdriver is same as(null) ? 'null' : jsResult.webdriver ? 'true' : 'false' }}</p>
+            {% endif %}
             {% if error %}
                 <p style="margin-top:12px; color:#ffb4b4;">{{ error }}</p>
             {% endif %}
