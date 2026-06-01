@@ -15,17 +15,15 @@ use Throwable;
 )]
 class TestCommand extends Command
 {
-    private Client $client;
 
-    public function __construct(Client $client){
-        $this->client = $client;
-    }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $client = null;
         $targetUrl = 'https://www.ea.com/ru/games/ea-sports-fc/fc-25';
-
+        $client = Client::createChromeClient(
+        );
+dd($this->getRegistrationLink($targetUrl));
         try {
             $id = bin2hex(random_bytes(6));
             $logPath = '/tmp/chromedriver-'.$id.'.log';
@@ -79,11 +77,12 @@ class TestCommand extends Command
     public function getRegistrationLink(string $url): ?string
     {
         try {
+            $client = Client::createChromeClient();
             // 1. Загружаем страницу
-            $crawler = $this->client->request('GET', $url);
+            $crawler = $client->request('GET', $url);
 
             // Ждем загрузки JavaScript
-            $this->client->waitFor('.registration-button');
+            $client->waitFor('.registration-button');
 
             echo "Страница загружена\n";
 
@@ -106,7 +105,7 @@ class TestCommand extends Command
             sleep(2);
 
             // 4. Получаем URL после клика
-            $currentUrl = $this->client->getCurrentURL();
+            $currentUrl = $client->getCurrentURL();
 
             // Если URL изменился - это редирект
             if ($currentUrl !== $url) {
@@ -123,10 +122,10 @@ class TestCommand extends Command
             }
 
             // Проверяем открытые окна
-            $windowHandles = $this->client->getWebDriver()->getWindowHandles();
+            $windowHandles = $client->getWebDriver()->getWindowHandles();
             if (count($windowHandles) > 1) {
-                $this->client->getWebDriver()->switchTo()->window(end($windowHandles));
-                $newUrl = $this->client->getCurrentURL();
+                $client->getWebDriver()->switchTo()->window(end($windowHandles));
+                $newUrl = $client->getCurrentURL();
                 echo "Новая вкладка: $newUrl\n";
                 return $newUrl;
             }
