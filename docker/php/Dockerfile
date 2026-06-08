@@ -91,6 +91,8 @@ CMD ["php-fpm"]
 FROM base AS dev
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    xvfb \
+    xauth \
     $PHPIZE_DEPS \
     && pecl install xdebug \
     && docker-php-ext-enable xdebug \

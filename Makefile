@@ -28,6 +28,9 @@ migrate: ## Применить миграции БД
 scrape: ## Поставить парсинг каталога в очередь
 	$(PHP) php bin/console app:scrape:catalog
 
+scrape-ea: ## Парсинг EA FUT (headed через xvfb)
+	$(COMPOSE) exec -e PANTHER_NO_HEADLESS=1 php xvfb-run -a php bin/console app:scrape:ea
+
 worker: ## Запустить воркер очереди (foreground)
 	$(COMPOSE) up worker
 

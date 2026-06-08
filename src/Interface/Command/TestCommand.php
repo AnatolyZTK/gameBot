@@ -1,139 +1,216 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Interface\Command;
 
+use App\Infrastructure\Browser\StealthChromeClientFactory;
+use Facebook\WebDriver\WebDriverBy;
+use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Panther\Client;
 use Throwable;
 
 #[AsCommand(
     name: 'app:scrape:ea',
-    description: 'Поставить в очередь парсинг каталога игрового сайта',
+    description: 'Парсинг EA SPORTS FC Ultimate Team Web App через stealth-браузер',
 )]
-class TestCommand extends Command
+final class TestCommand extends Command
 {
+    private const FUT_WEB_APP_URL = 'https://www.ea.com/ea-sports-fc/ultimate-team/web-app/';
+    private const LOGIN_BUTTON = 'button.btn-standard.primary';
+    private const SIGNIN_EMAIL = '#email';
+    private const SIGNIN_EMAIL_NEXT = '#logInBtn';
+    private const SIGNIN_PASSWORD = '#password';
 
+    public function __construct(
+        private readonly StealthChromeClientFactory $browserFactory,
+    ) {
+        parent::__construct();
+    }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $io = new SymfonyStyle($input, $output);
         $client = null;
-        $targetUrl = 'https://www.ea.com/ru/games/ea-sports-fc/fc-25';
-        $client = Client::createChromeClient(
-        );
-dd($this->getRegistrationLink($targetUrl));
+
         try {
-            $id = bin2hex(random_bytes(6));
-            $logPath = '/tmp/chromedriver-'.$id.'.log';
-            $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+            $client = $this->browserFactory->create();
+            $this->browserFactory->prepare($client);
 
-            $client = Client::createChromeClient(
-//                chromeDriverBinary: null,
-//                arguments: [
-//                    '--headless=new',
-//                    '--no-sandbox',
-//                    '--disable-dev-shm-usage',
-//                    '--disable-gpu',
-//                    '--disable-blink-features=AutomationControlled',
-//                    '--window-size=1366,768',
-//                    '--lang=ru-RU,ru',
-//                    '--user-agent='.$userAgent,
-////                    '--user-data-dir='.$userDataDir,
-////                    '--crash-dumps-dir='.$crashDir,
-//                ],
-//                options: [
-//                    'host' => '127.0.0.1',
-////                    'port' => $port,
-//                    'chromedriver_arguments' => [
-//                        '--verbose',
-//                        '--log-path='.$logPath,
-//                    ],
-//                ],
-            );
+            $html = $this->openFutWebApp($client);
+            if ($this->browserFactory->isUnsupportedBrowserPage($html)) {
+                $io->error(
+                    'EA определила браузер как неподдерживаемый (нет WebGL/WebAssembly). '
+                    .'Убедитесь, что Chrome запускается с --use-angle=swiftshader в Docker.'
+                );
 
+                return Command::FAILURE;
+            }
 
-            $crawler = $client->request('GET', 'https://www.ea.com/ru/games/ea-sports-fc/fc-25/');
-          $crawler->filter('');
+            $client->waitFor('.ut-login-content', 30);
+            $loginUrl = $this->clickLoginAndFollowAuthUrl($client);
+            $io->note('Переход на страницу входа EA: '.$loginUrl);
 
+            $email = $this->resolveCredential('EA_LOGIN_EMAIL');
+            $passwordUrl = $this->submitEmailAndFollowAuthUrl($client, $email);
+            $io->note('Переход на шаг пароля: '.$passwordUrl);
 
+            $password = $this->resolveCredential('EA_LOGIN_PASSWORD');
+            $this->fillPassword($client, $password);
+            $io->success('Email и пароль введены на странице входа EA');
 
-        dd($client->getCrawler()->html());
+            return Command::SUCCESS;
+        } catch (Throwable $e) {
+            $io->error($e->getMessage());
 
-
-
-        } catch (Throwable $exception) {
-            $error = $exception->getMessage();
-            dump($error);
+            return Command::FAILURE;
         } finally {
             try {
                 $client?->quit();
             } catch (Throwable) {
             }
         }
-        return 0;
     }
-    public function getRegistrationLink(string $url): ?string
+
+    private function openFutWebApp(Client $client): string
     {
-        try {
-            $client = Client::createChromeClient();
-            // 1. Загружаем страницу
-            $crawler = $client->request('GET', $url);
+        $crawler = $client->request('GET', self::FUT_WEB_APP_URL);
+        usleep(2_000_000);
+        $this->browserFactory->afterNavigation($client);
 
-            // Ждем загрузки JavaScript
-            $client->waitFor('.registration-button');
+        $html = $crawler->html();
+        if ($this->browserFactory->isUnsupportedBrowserPage($html)) {
+            $client->reload();
+            usleep(2_000_000);
+            $this->browserFactory->afterNavigation($client);
+            $html = $client->getCrawler()->html();
+        }
 
-            echo "Страница загружена\n";
+        return $html;
+    }
 
-            // 2. Ищем кнопку регистрации (разные варианты)
-            $button = $crawler->filter('.registration-button')->first();
+    private function clickLoginAndFollowAuthUrl(Client $client): string
+    {
+        $this->dismissBlockingOverlays($client);
+        $client->waitForVisibility(self::LOGIN_BUTTON, 15);
 
-            // Если кнопка не найдена, пробуем другие селекторы
-            if ($button->count() === 0) {
-                $button = $crawler->filter('button:contains("Регистрация")')->first();
+        if (0 === $client->getCrawler()->filter(self::LOGIN_BUTTON)->count()) {
+            throw new RuntimeException('Кнопка Login (.btn-standard.primary) не найдена');
+        }
+
+        $client->executeScript($this->loginUrlCaptureScript());
+        $previousUrl = $client->getCurrentURL();
+
+        $driver = $client->getWebDriver();
+        $button = $driver->findElement(WebDriverBy::cssSelector(self::LOGIN_BUTTON));
+        $driver->executeScript('arguments[0].scrollIntoView({block: "center"});', [$button]);
+        $button->click();
+
+        $loginUrl = $this->waitForLoginUrl($client, $previousUrl);
+
+        if ($client->getCurrentURL() === $previousUrl) {
+            $client->request('GET', $loginUrl);
+        }
+
+        $client->waitFor(self::SIGNIN_EMAIL, 30);
+
+        return $loginUrl;
+    }
+
+    private function submitEmailAndFollowAuthUrl(Client $client, string $email): string
+    {
+        $client->waitForVisibility(self::SIGNIN_EMAIL, 30);
+        $driver = $client->getWebDriver();
+        $emailField = $driver->findElement(WebDriverBy::cssSelector(self::SIGNIN_EMAIL));
+        $emailField->clear();
+        $emailField->sendKeys($email);
+
+        $client->executeScript($this->loginUrlCaptureScript());
+        $previousUrl = $client->getCurrentURL();
+
+        $driver->findElement(WebDriverBy::cssSelector(self::SIGNIN_EMAIL_NEXT))->click();
+
+        $passwordUrl = $this->waitForLoginUrl($client, $previousUrl);
+        if ($client->getCurrentURL() === $previousUrl) {
+            $client->request('GET', $passwordUrl);
+        }
+
+        $client->waitForVisibility(self::SIGNIN_PASSWORD, 30);
+
+        return $passwordUrl;
+    }
+
+    private function fillPassword(Client $client, string $password): void
+    {
+        $driver = $client->getWebDriver();
+        $passwordField = $driver->findElement(WebDriverBy::cssSelector(self::SIGNIN_PASSWORD));
+        $passwordField->clear();
+        $passwordField->sendKeys($password);
+    }
+
+    private function resolveCredential(string $name): string
+    {
+        $value = $_ENV[$name] ?? $_SERVER[$name] ?? getenv($name);
+        if (!is_string($value) || $value === '') {
+            throw new RuntimeException(sprintf('Задайте переменную окружения %s', $name));
+        }
+
+        return $value;
+    }
+
+    private function waitForLoginUrl(Client $client, string $previousUrl): string
+    {
+        $deadline = microtime(true) + 30.0;
+
+        while (microtime(true) < $deadline) {
+            $captured = $client->executeScript('return window.__eaLoginUrl');
+            if (is_string($captured) && $captured !== '') {
+                return $captured;
             }
 
-            if ($button->count() === 0) {
-                throw new \Exception('Кнопка регистрации не найдена');
-            }
-
-            // 3. Кликаем по кнопке
-            $button->click();
-
-            // Ждем появления новой вкладки или редиректа
-            sleep(2);
-
-            // 4. Получаем URL после клика
             $currentUrl = $client->getCurrentURL();
-
-            // Если URL изменился - это редирект
-            if ($currentUrl !== $url) {
-                echo "Редирект на: $currentUrl\n";
+            if ($currentUrl !== $previousUrl && str_starts_with($currentUrl, 'http')) {
                 return $currentUrl;
             }
 
-            // Проверяем наличие ссылки на странице
-            $link = $crawler->filter('a.registration-link')->first();
-            if ($link->count() > 0) {
-                $href = $link->attr('href');
-                echo "Найдена ссылка: $href\n";
-                return $href;
-            }
-
-            // Проверяем открытые окна
-            $windowHandles = $client->getWebDriver()->getWindowHandles();
-            if (count($windowHandles) > 1) {
-                $client->getWebDriver()->switchTo()->window(end($windowHandles));
-                $newUrl = $client->getCurrentURL();
-                echo "Новая вкладка: $newUrl\n";
-                return $newUrl;
-            }
-
-        } catch (\Exception $e) {
-            echo "Ошибка: " . $e->getMessage() . "\n";
+            usleep(250_000);
         }
 
-        return null;
+        throw new RuntimeException('Ссылка для входа не была сгенерирована после клика по Login');
+    }
+
+    private function dismissBlockingOverlays(Client $client): void
+    {
+        $client->executeScript(
+            'document.querySelectorAll(".ui-orientation-warning").forEach(el => el.remove());',
+        );
+    }
+
+    private function loginUrlCaptureScript(): string
+    {
+        return <<<'JS'
+window.__eaLoginUrl = window.__eaLoginUrl ?? null;
+const capture = (url) => {
+  if (!url) return;
+  const value = String(url);
+  if (value.startsWith('http://') || value.startsWith('https://')) {
+    window.__eaLoginUrl = value;
+  }
+};
+if (!window.__eaLoginCaptureInstalled) {
+  window.__eaLoginCaptureInstalled = true;
+  const open = window.open;
+  window.open = function(url, ...args) { capture(url); return open.apply(this, [url, ...args]); };
+  const assign = Location.prototype.assign;
+  Location.prototype.assign = function(url) { capture(url); return assign.call(this, url); };
+  const replace = Location.prototype.replace;
+  Location.prototype.replace = function(url) { capture(url); return replace.call(this, url); };
+}
+JS;
     }
 }
