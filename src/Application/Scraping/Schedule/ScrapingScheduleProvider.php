@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Scraping\Schedule;
 
 use App\Application\Scraping\Message\ScrapePageMessage;
+use Symfony\Component\Console\Messenger\RunCommandMessage;
 use Symfony\Component\Messenger\Message\RedispatchMessage;
 use Symfony\Component\Scheduler\Attribute\AsSchedule;
 use Symfony\Component\Scheduler\RecurringMessage;
@@ -30,6 +31,13 @@ final class ScrapingScheduleProvider implements ScheduleProviderInterface
                     new RedispatchMessage(new ScrapePageMessage('/catalog/full'), 'async'),
                 ),
                 'nightly-full-scrape',
+            )
+            ->add(
+                RecurringMessage::every(
+                    '10 minutes',
+                    new RunCommandMessage('app:sync:prices --favorites-only'),
+                ),
+                'futbin-price-sync',
             );
     }
 }

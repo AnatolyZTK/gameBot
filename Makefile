@@ -31,6 +31,30 @@ scrape: ## Поставить парсинг каталога в очередь
 scrape-ea: ## Парсинг EA FUT (headed через xvfb)
 	$(COMPOSE) exec -e PANTHER_NO_HEADLESS=1 php xvfb-run -a php bin/console app:scrape:ea
 
+sync-prices: ## Синхронизация цен Futbin (избранные)
+	$(PHP) php bin/console app:sync:prices --favorites-only
+
+futbin-auth: ## Сохранить Futbin cookies для app:sync:prices
+	$(COMPOSE) exec -e PANTHER_NO_HEADLESS=1 php xvfb-run -a php bin/console app:futbin:auth
+
+fut-market-test: ## Проверка FUT transfer market (coins + search)
+	$(PHP) php bin/console app:fut:market-test
+
+account-add: ## Добавить EA-аккаунт в БД
+	$(PHP) php bin/console app:account:add
+
+account-list: ## Список EA-аккаунтов
+	$(PHP) php bin/console app:account:list
+
+transfer-plan: ## План перевода (dry-run)
+	$(PHP) php bin/console app:transfer:plan
+
+transfer-run: ## Запустить перевод (очередь)
+	$(PHP) php bin/console app:transfer:run
+
+transfer-list: ## Список переводов
+	$(PHP) php bin/console app:transfer:list
+
 worker: ## Запустить воркер очереди (foreground)
 	$(COMPOSE) up worker
 

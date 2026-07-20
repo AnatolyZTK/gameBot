@@ -10,6 +10,9 @@ parameters:
     env(GAME_SITE_BASE_URL): ''
     env(GAME_SITE_REQUEST_DELAY_MS): '1500'
     env(GAME_SITE_MAX_RETRIES): '3'
+    env(FUTBIN_BASE_URL): 'https://www.futbin.com'
+    env(FUTBIN_GAME_VERSION): '26'
+    env(FUTBIN_REQUEST_DELAY_MS): '1200'
 
     app.manticore.host: '%env(MANTICORE_HOST)%'
     app.manticore.port: '%env(int:MANTICORE_PORT)%'
@@ -17,6 +20,11 @@ parameters:
     app.game_site.base_url: '%env(GAME_SITE_BASE_URL)%'
     app.game_site.request_delay_ms: '%env(int:GAME_SITE_REQUEST_DELAY_MS)%'
     app.game_site.max_retries: '%env(int:GAME_SITE_MAX_RETRIES)%'
+    app.futbin.base_url: '%env(FUTBIN_BASE_URL)%'
+    app.futbin.game_version: '%env(FUTBIN_GAME_VERSION)%'
+    app.futbin.request_delay_ms: '%env(int:FUTBIN_REQUEST_DELAY_MS)%'
+    app.futbin.cookie_file: '%kernel.project_dir%/var/futbin/cookies.json'
+    app.futbin.browser_profile_dir: '%kernel.project_dir%/var/browser-profiles/futbin-scraper/user-data'
     app.browser_profiles_dir: '%kernel.project_dir%/var/browser-profiles'
 
 services:
@@ -35,6 +43,26 @@ services:
             $baseUrl: '%app.game_site.base_url%'
             $requestDelayMs: '%app.game_site.request_delay_ms%'
             $maxRetries: '%app.game_site.max_retries%'
+
+    App\Infrastructure\Futbin\FutbinHttpClient:
+        arguments:
+            $baseUrl: '%app.futbin.base_url%'
+            $requestDelayMs: '%app.futbin.request_delay_ms%'
+
+    App\Infrastructure\Futbin\FutbinCookieProvider:
+        arguments:
+            $cookieFile: '%app.futbin.cookie_file%'
+
+    App\Infrastructure\Futbin\FutbinBrowserFetcher:
+        arguments:
+            $baseUrl: '%app.futbin.base_url%'
+            $gameVersion: '%app.futbin.game_version%'
+            $userDataDir: '%app.futbin.browser_profile_dir%'
+
+    App\Infrastructure\Futbin\PriceParserService:
+        arguments:
+            $gameVersion: '%app.futbin.game_version%'
+            $logger: '@monolog.logger.scraping'
 
     App\Infrastructure\Browser\BrowserProfileSnapshotStorage:
         arguments:

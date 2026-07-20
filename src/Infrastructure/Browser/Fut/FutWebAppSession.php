@@ -1,0 +1,66 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Infrastructure\Browser\Fut;
+
+use App\Infrastructure\Browser\BrowserProfileSnapshotStorage;
+use App\Infrastructure\Browser\StealthChromeClientFactory;
+use Symfony\Component\Panther\Client;
+
+final class FutWebAppSession
+{
+    private const FUT_URL = 'https://www.ea.com/ea-sports-fc/ultimate-team/web-app/';
+
+    private function __construct(
+        private readonly Client $client,
+        private readonly StealthChromeClientFactory $browserFactory,
+    ) {
+    }
+
+    public static function open(
+        StealthChromeClientFactory $browserFactory,
+        BrowserProfileSnapshotStorage $profileStorage,
+        string $email,
+    ): self {
+        $profileStorage->repairPermissionsForWebServer();
+        $accountKey = $profileStorage->accountKeyFromEmail($email);
+        $client = $browserFactory->createForAccount($accountKey);
+        $browserFactory->prepare($client);
+        $client->request('GET', self::FUT_URL);
+        usleep(2_000_000);
+        $browserFactory->afterNavigation($client);
+        $browserFactory->waitForInteractive($client);
+
+        if (!$browserFactory->waitForStableSession($client, 3.0, 90.0)) {
+            $client->quit();
+            $browserFactory->stopProxyRelay();
+
+            throw new \RuntimeException('FUT-сессия не авторизована для '.$email.'. Запустите app:scrape:ea.');
+        }
+
+        $browserFactory->dismissBlockingOverlays($client);
+
+        return new self($client, $browserFactory);
+    }
+
+    public function client(): Client
+    {
+        return $this->client;
+    }
+
+    public function factory(): StealthChromeClientFactory
+    {
+        return $this->browserFactory;
+    }
+
+    public function close(): void
+    {
+        try {
+            $this->client->quit();
+        } catch (\Throwable) {
+        }
+
+        $this->browserFactory->stopProxyRelay();
+    }
+}

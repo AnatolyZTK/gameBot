@@ -69,6 +69,17 @@ JS;
         );
     }
 
+    public function createWithProfileDirectory(string $userDataDir): Client
+    {
+        @mkdir($userDataDir, 0777, true);
+        @chmod($userDataDir, 0777);
+
+        return $this->createWithDirectories(
+            userDataDir: $userDataDir,
+            crashDir: $userDataDir.'-crashes',
+        );
+    }
+
     private function createWithDirectories(string $userDataDir, string $crashDir): Client
     {
         $this->ensureChromeEnvironment();
