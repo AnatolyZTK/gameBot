@@ -1,0 +1,171 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}FUT Dashboard{% endblock %}
+
+{% block stylesheets %}
+<style>
+    body {
+        margin: 0;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #0d1117;
+        color: #e6edf3;
+    }
+
+    .dashboard {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 32px 20px 48px;
+    }
+
+    .dashboard-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 28px;
+    }
+
+    .dashboard-header h1 {
+        margin: 0;
+        font-size: 1.75rem;
+        font-weight: 600;
+    }
+
+    .dashboard-header p {
+        margin: 6px 0 0;
+        color: #8b949e;
+        font-size: 0.95rem;
+    }
+
+    .coins-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 20px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #1f6feb 0%, #1158c7 100%);
+        box-shadow: 0 10px 30px rgba(31, 111, 235, 0.25);
+        min-width: 220px;
+    }
+
+    .coins-label {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        opacity: 0.85;
+    }
+
+    .coins-value {
+        font-size: 1.6rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .alert {
+        padding: 14px 16px;
+        border-radius: 10px;
+        background: rgba(248, 81, 73, 0.12);
+        border: 1px solid rgba(248, 81, 73, 0.35);
+        color: #ffb4af;
+        margin-bottom: 24px;
+    }
+
+    .tiles-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 16px;
+    }
+
+    .tile-card {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 14px;
+        padding: 18px;
+        min-height: 120px;
+    }
+
+    .tile-card h2 {
+        margin: 0 0 12px;
+        font-size: 1rem;
+        color: #58a6ff;
+    }
+
+    .tile-lines {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .tile-lines li {
+        padding: 4px 0;
+        color: #c9d1d9;
+        line-height: 1.45;
+        border-bottom: 1px solid rgba(48, 54, 61, 0.7);
+    }
+
+    .tile-lines li:last-child {
+        border-bottom: none;
+    }
+
+    .empty-state {
+        padding: 28px;
+        border-radius: 14px;
+        border: 1px dashed #30363d;
+        color: #8b949e;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<main class="dashboard">
+    <header class="dashboard-header">
+        <div>
+            <h1>FC Ultimate Team</h1>
+            {% if accountEmail %}
+                <p>Аккаунт: {{ accountEmail }}</p>
+            {% endif %}
+        </div>
+
+        {% if dashboard and dashboard.coins %}
+            <div class="coins-card">
+                <div>
+                    <div class="coins-label">Монеты</div>
+                    <div class="coins-value">{{ dashboard.coins }}</div>
+                </div>
+            </div>
+        {% endif %}
+    </header>
+
+    {% if error %}
+        <div class="alert">{{ error }}</div>
+    {% endif %}
+
+    {% if dashboard and dashboard.tiles is not empty %}
+        <section class="tiles-grid">
+            {% for tile in dashboard.tiles %}
+                <article class="tile-card">
+                    {% if tile.title %}
+                        <h2>{{ tile.title }}</h2>
+                    {% endif %}
+
+                    {% if tile.lines is not empty %}
+                        <ul class="tile-lines">
+                            {% for line in tile.lines %}
+                                <li>{{ line }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p>{{ tile.text }}</p>
+                    {% endif %}
+                </article>
+            {% endfor %}
+        </section>
+    {% elseif dashboard and dashboard.authenticated %}
+        <div class="empty-state">
+            Данные из <code>.tileContent</code> пока не найдены. Возможно, приложение ещё не отрисовало плитки.
+        </div>
+    {% endif %}
+</main>
+{% endblock %}

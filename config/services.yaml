@@ -17,6 +17,7 @@ parameters:
     app.game_site.base_url: '%env(GAME_SITE_BASE_URL)%'
     app.game_site.request_delay_ms: '%env(int:GAME_SITE_REQUEST_DELAY_MS)%'
     app.game_site.max_retries: '%env(int:GAME_SITE_MAX_RETRIES)%'
+    app.browser_profiles_dir: '%kernel.project_dir%/var/browser-profiles'
 
 services:
     _defaults:
@@ -34,6 +35,10 @@ services:
             $baseUrl: '%app.game_site.base_url%'
             $requestDelayMs: '%app.game_site.request_delay_ms%'
             $maxRetries: '%app.game_site.max_retries%'
+
+    App\Infrastructure\Browser\BrowserProfileSnapshotStorage:
+        arguments:
+            $profilesDir: '%app.browser_profiles_dir%'
 
     App\Infrastructure\Search\Manticore\ManticoreClientFactory:
         arguments:

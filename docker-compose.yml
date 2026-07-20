@@ -2,10 +2,7 @@ name: gameparser
 
 x-panther-env: &panther-env
   HOME: /tmp
-  XDG_CONFIG_HOME: /tmp/.chromium
-  XDG_CACHE_HOME: /tmp/.chromium
   PANTHER_NO_SANDBOX: "1"
-  PANTHER_CHROME_ARGUMENTS: "--disable-dev-shm-usage --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader --user-data-dir=/tmp/panther-user --crash-dumps-dir=/tmp/panther-crashes"
   PANTHER_ERROR_SCREENSHOT_DIR: /tmp/panther-error-screenshots
 
 services:
