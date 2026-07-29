@@ -6,6 +6,7 @@ namespace App\Infrastructure\Browser\Fut;
 
 use App\Infrastructure\Browser\BrowserProfileSnapshotStorage;
 use App\Infrastructure\Browser\StealthChromeClientFactory;
+use App\Infrastructure\Persistence\Entity\Account;
 use Symfony\Component\Panther\Client;
 
 final class FutWebAppSession
@@ -15,17 +16,18 @@ final class FutWebAppSession
     private function __construct(
         private readonly Client $client,
         private readonly StealthChromeClientFactory $browserFactory,
+        private readonly Account $account,
     ) {
     }
 
     public static function open(
         StealthChromeClientFactory $browserFactory,
         BrowserProfileSnapshotStorage $profileStorage,
-        string $email,
+        Account $account,
     ): self {
         $profileStorage->repairPermissionsForWebServer();
-        $accountKey = $profileStorage->accountKeyFromEmail($email);
-        $client = $browserFactory->createForAccount($accountKey);
+        $accountKey = $profileStorage->accountKeyFromEmail($account->getEmail());
+        $client = $browserFactory->createForAccount($accountKey, $account->getProxyUrl());
         $browserFactory->prepare($client);
         $client->request('GET', self::FUT_URL);
         usleep(2_000_000);
@@ -36,12 +38,20 @@ final class FutWebAppSession
             $client->quit();
             $browserFactory->stopProxyRelay();
 
-            throw new \RuntimeException('FUT-сессия не авторизована для '.$email.'. Запустите app:scrape:ea.');
+            throw new \RuntimeException(
+                'FUT-сессия не авторизована для '.$account->getEmail()
+                .'. Запустите: php bin/console app:account:login --email='.$account->getEmail()
+            );
         }
 
         $browserFactory->dismissBlockingOverlays($client);
 
-        return new self($client, $browserFactory);
+        return new self($client, $browserFactory, $account);
+    }
+
+    public function account(): Account
+    {
+        return $this->account;
     }
 
     public function client(): Client

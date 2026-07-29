@@ -38,17 +38,22 @@ final class AccountListCommand extends Command
         }
 
         $io->table(
-            ['ID', 'Email', 'Platform', 'Balance', 'Sales left', 'Cooldown until', 'Can send'],
+            ['ID', 'Email', 'Platform', 'Proxy', 'Balance', 'Sales left', 'Can send'],
             array_map(function ($account) use ($now): array {
-                $cooldown = $account->getCooldownUntil();
+                $proxy = $account->getProxyUrl();
+                $proxyHost = '—';
+                if (is_string($proxy) && $proxy !== '') {
+                    $parts = parse_url($proxy);
+                    $proxyHost = ($parts['host'] ?? '?').(isset($parts['port']) ? ':'.$parts['port'] : '');
+                }
 
                 return [
                     $account->getId()->toRfc4122(),
                     $account->getEmail(),
                     $account->getPlatform()->value,
+                    $proxyHost,
                     $account->getBalance() !== null ? number_format($account->getBalance(), 0, '.', ' ') : '—',
                     (string) $this->safetyService->getRemainingDailySales($account, $now),
-                    $cooldown?->format('Y-m-d H:i') ?? '—',
                     $this->safetyService->canAccountSend($account, $now) ? 'yes' : 'no',
                 ];
             }, $accounts),

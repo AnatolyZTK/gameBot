@@ -46,6 +46,12 @@ account-add: ## Добавить EA-аккаунт в БД
 account-list: ## Список EA-аккаунтов
 	$(PHP) php bin/console app:account:list
 
+account-seed: ## Заполнить 3 тестовых EA-аккаунта
+	$(PHP) php bin/console app:account:seed
+
+account-login: ## Логин всех аккаунтов (сохранить профили)
+	$(COMPOSE) exec -e PANTHER_NO_HEADLESS=1 php xvfb-run -a php bin/console app:account:login --all
+
 transfer-plan: ## План перевода (dry-run)
 	$(PHP) php bin/console app:transfer:plan
 
@@ -54,6 +60,9 @@ transfer-run: ## Запустить перевод (очередь)
 
 transfer-list: ## Список переводов
 	$(PHP) php bin/console app:transfer:list
+
+transfer-pair-test: ## Тест sell+snipe между аккаунтами
+	$(COMPOSE) exec -e PANTHER_NO_HEADLESS=1 php xvfb-run -a php bin/console app:transfer:pair-test
 
 worker: ## Запустить воркер очереди (foreground)
 	$(COMPOSE) up worker

@@ -25,6 +25,15 @@ class Account
     #[ORM\Column(length: 255)]
     private string $email;
 
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $password = null;
+
+    #[ORM\Column(name: 'totp_secret', length: 64, nullable: true)]
+    private ?string $totpSecret = null;
+
+    #[ORM\Column(name: 'proxy_url', length: 512, nullable: true)]
+    private ?string $proxyUrl = null;
+
     #[ORM\Column(length: 16, enumType: Platform::class)]
     private Platform $platform;
 
@@ -68,6 +77,21 @@ class Account
         return $this->email;
     }
 
+    public function getPassword(): ?string
+    {
+        return $this->password;
+    }
+
+    public function getTotpSecret(): ?string
+    {
+        return $this->totpSecret;
+    }
+
+    public function getProxyUrl(): ?string
+    {
+        return $this->proxyUrl;
+    }
+
     public function getPlatform(): Platform
     {
         return $this->platform;
@@ -98,6 +122,14 @@ class Account
         return $this->isActive;
     }
 
+    public function setCredentials(?string $password, ?string $totpSecret, ?string $proxyUrl): void
+    {
+        $this->password = $password !== null && $password !== '' ? $password : null;
+        $this->totpSecret = $totpSecret !== null && $totpSecret !== '' ? strtoupper(trim($totpSecret)) : null;
+        $this->proxyUrl = $proxyUrl !== null && $proxyUrl !== '' ? $proxyUrl : null;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     public function setBalance(?int $balance): void
     {
         $this->balance = $balance;
@@ -121,5 +153,23 @@ class Account
 
         ++$this->dailySalesCount;
         $this->updatedAt = $now;
+    }
+
+    public function requirePassword(): string
+    {
+        if ($this->password === null || $this->password === '') {
+            throw new \RuntimeException('У аккаунта '.$this->email.' не задан password.');
+        }
+
+        return $this->password;
+    }
+
+    public function requireTotpSecret(): string
+    {
+        if ($this->totpSecret === null || $this->totpSecret === '') {
+            throw new \RuntimeException('У аккаунта '.$this->email.' не задан totp_secret.');
+        }
+
+        return $this->totpSecret;
     }
 }

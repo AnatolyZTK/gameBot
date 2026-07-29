@@ -22,6 +22,8 @@ final class StealthChromeClientFactory
 
     private ?LocalHttpProxyRelay $proxyRelay = null;
 
+    private ?string $httpsProxyOverride = null;
+
     private const STEALTH_JS = <<<'JS'
 (() => {
   if (window.__stealthApplied) return;
@@ -59,9 +61,10 @@ JS;
         );
     }
 
-    public function createForAccount(string $accountKey): Client
+    public function createForAccount(string $accountKey, ?string $httpsProxy = null): Client
     {
         $this->profileStorage->repairPermissionsForWebServer();
+        $this->httpsProxyOverride = $httpsProxy;
 
         return $this->createWithDirectories(
             userDataDir: $this->profileStorage->getUserDataDirectory($accountKey),
@@ -485,6 +488,7 @@ JS);
     {
         $this->proxyRelay?->stop();
         $this->proxyRelay = null;
+        $this->httpsProxyOverride = null;
     }
 
     private function resolveChromeProxyServer(): ?string
@@ -521,6 +525,10 @@ JS);
 
     private function resolveHttpsProxy(): ?string
     {
+        if (is_string($this->httpsProxyOverride) && $this->httpsProxyOverride !== '') {
+            return $this->httpsProxyOverride;
+        }
+
         foreach (['EA_HTTPS_PROXY', 'HTTPS_PROXY', 'HTTP_PROXY'] as $name) {
             $value = $_ENV[$name] ?? $_SERVER[$name] ?? getenv($name);
             if (is_string($value) && $value !== '') {

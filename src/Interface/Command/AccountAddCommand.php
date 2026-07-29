@@ -32,7 +32,10 @@ final class AccountAddCommand extends Command
     {
         $this
             ->addOption('email', null, InputOption::VALUE_REQUIRED, 'Email EA-аккаунта')
-            ->addOption('platform', 'p', InputOption::VALUE_REQUIRED, 'Платформа: ps, xbox, pc', 'ps');
+            ->addOption('platform', 'p', InputOption::VALUE_REQUIRED, 'Платформа: ps, xbox, pc', 'ps')
+            ->addOption('password', null, InputOption::VALUE_REQUIRED, 'Пароль EA')
+            ->addOption('totp', null, InputOption::VALUE_REQUIRED, 'TOTP secret (2FA)')
+            ->addOption('proxy', null, InputOption::VALUE_REQUIRED, 'HTTPS proxy URL (http://user:pass@host:port)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -66,6 +69,21 @@ final class AccountAddCommand extends Command
 
         $existing = $this->accountRepository->findByEmail($email);
         if ($existing instanceof Account) {
+            $password = $input->getOption('password');
+            $totp = $input->getOption('totp');
+            $proxy = $input->getOption('proxy');
+            if (is_string($password) || is_string($totp) || is_string($proxy)) {
+                $existing->setCredentials(
+                    is_string($password) ? $password : $existing->getPassword(),
+                    is_string($totp) ? $totp : $existing->getTotpSecret(),
+                    is_string($proxy) ? $proxy : $existing->getProxyUrl(),
+                );
+                $this->entityManager->flush();
+                $io->success(sprintf('Аккаунт обновлён: %s (id=%s)', $existing->getEmail(), $existing->getId()->toRfc4122()));
+
+                return Command::SUCCESS;
+            }
+
             $io->warning(sprintf(
                 'Аккаунт уже существует: %s (%s, id=%s)',
                 $existing->getEmail(),
@@ -77,6 +95,14 @@ final class AccountAddCommand extends Command
         }
 
         $account = new Account($email, $platform);
+        $password = $input->getOption('password');
+        $totp = $input->getOption('totp');
+        $proxy = $input->getOption('proxy');
+        $account->setCredentials(
+            is_string($password) ? $password : null,
+            is_string($totp) ? $totp : null,
+            is_string($proxy) ? $proxy : null,
+        );
         $this->entityManager->persist($account);
         $this->entityManager->flush();
 

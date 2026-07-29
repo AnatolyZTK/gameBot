@@ -75,7 +75,7 @@ final class SniperService
     private function runForAccount(Account $account, callable $callback): bool
     {
         try {
-            return (bool) $this->sessionFactory->withSession($account->getEmail(), $callback);
+            return (bool) $this->sessionFactory->withAccount($account, $callback);
         } catch (\Throwable $exception) {
             $this->logger->error('Sniper operation failed', [
                 'account' => $account->getEmail(),
