@@ -1,0 +1,58 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block title %}Перевод {{ transfer.id }} — Coinwire{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <h1>Перевод</h1>
+        <p class="mono">{{ transfer.id.toRfc4122 }}</p>
+    </div>
+    <a class="btn btn-ghost" href="{{ path('admin_transfers') }}">К списку</a>
+</header>
+
+<section class="panel">
+    <div class="form-grid">
+        <div>
+            <span class="label" style="color:var(--muted);font-size:0.75rem;text-transform:uppercase">Статус</span>
+            <div style="margin-top:6px">
+                {% set s = transfer.status.value %}
+                <span class="badge {{ s == 'completed' ? 'badge-ok' : (s == 'failed' ? 'badge-err' : (s == 'executing' ? 'badge-warn' : 'badge-mute')) }}">{{ s }}</span>
+            </div>
+        </div>
+        <div>
+            <span class="label" style="color:var(--muted);font-size:0.75rem;text-transform:uppercase">Сумма</span>
+            <div class="mono" style="font-size:1.4rem;margin-top:4px">{{ transfer.targetAmount|number_format(0, '.', ' ') }}</div>
+        </div>
+        <div>
+            <span class="label" style="color:var(--muted);font-size:0.75rem;text-transform:uppercase">Sender</span>
+            <div style="margin-top:4px">{{ transfer.senderAccount ? transfer.senderAccount.email : '—' }}</div>
+        </div>
+        <div>
+            <span class="label" style="color:var(--muted);font-size:0.75rem;text-transform:uppercase">Receiver</span>
+            <div style="margin-top:4px">{{ transfer.receiverAccount.email }}</div>
+        </div>
+        <div>
+            <span class="label" style="color:var(--muted);font-size:0.75rem;text-transform:uppercase">Создан</span>
+            <div class="mono" style="margin-top:4px">{{ transfer.createdAt|date('Y-m-d H:i:s') }}</div>
+        </div>
+        <div>
+            <span class="label" style="color:var(--muted);font-size:0.75rem;text-transform:uppercase">Завершён</span>
+            <div class="mono" style="margin-top:4px">{{ transfer.completedAt ? transfer.completedAt|date('Y-m-d H:i:s') : '—' }}</div>
+        </div>
+        {% if transfer.errorMessage %}
+            <div class="full">
+                <span class="label" style="color:var(--muted);font-size:0.75rem;text-transform:uppercase">Ошибка</span>
+                <div class="flash flash-error" style="margin-top:8px;margin-bottom:0">{{ transfer.errorMessage }}</div>
+            </div>
+        {% endif %}
+    </div>
+</section>
+
+{% if transfer.plan %}
+<section class="panel">
+    <h2>План (JSON snapshot)</h2>
+    <pre class="mono" style="white-space:pre-wrap;color:var(--muted);font-size:0.8rem;margin:0">{{ transfer.plan|json_encode(constant('JSON_PRETTY_PRINT'))|raw }}</pre>
+</section>
+{% endif %}
+{% endblock %}

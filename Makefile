@@ -72,3 +72,6 @@ scheduler: ## Запустить планировщик
 
 logs: ## Логи всех сервисов
 	$(COMPOSE) logs -f
+
+admin: ## Открыть URL админки
+	@echo "http://localhost:$${NGINX_HTTP_PORT:-8080}/admin"

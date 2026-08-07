@@ -26,4 +26,14 @@ final class PlayerRepository extends ServiceEntityRepository
     {
         return $this->findBy(['isFavorite' => true], ['name' => 'ASC']);
     }
+
+    /** @return list<Player> */
+    public function findAllOrdered(): array
+    {
+        return $this->createQueryBuilder('p')
+            ->orderBy('p.isFavorite', 'DESC')
+            ->addOrderBy('p.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
 }

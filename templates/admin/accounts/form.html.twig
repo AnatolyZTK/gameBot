@@ -1,0 +1,59 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block title %}{{ account ? 'Редактировать' : 'Новый' }} аккаунт — Coinwire{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <h1>{{ account ? account.email : 'Новый аккаунт' }}</h1>
+        <p>Пароль и TOTP хранятся в БД для логина и pair-test.</p>
+    </div>
+    <a class="btn btn-ghost" href="{{ path('admin_accounts') }}">К списку</a>
+</header>
+
+<section class="panel">
+    <form method="post" class="form-grid">
+        <input type="hidden" name="_token" value="{{ csrf_token(account ? 'account_edit_' ~ account.id : 'account_new') }}">
+
+        <label class="field">
+            Email
+            <input type="email" name="email" required value="{{ account ? account.email : '' }}" {{ account ? 'readonly' : '' }}>
+        </label>
+
+        <label class="field">
+            Платформа
+            <select name="platform" required>
+                {% for p in platforms %}
+                    <option value="{{ p.value }}" {% if account and account.platform == p %}selected{% endif %}>{{ p.label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label class="field">
+            Пароль
+            <input type="text" name="password" value="{{ account ? account.password : '' }}" autocomplete="off" placeholder="EA password">
+        </label>
+
+        <label class="field">
+            TOTP secret
+            <input type="text" name="totp" value="{{ account ? account.totpSecret : '' }}" autocomplete="off" placeholder="BASE32">
+        </label>
+
+        <label class="field full">
+            Proxy URL
+            <input type="text" name="proxy" value="{{ account ? account.proxyUrl : '' }}" placeholder="http://user:pass@host:port">
+        </label>
+
+        {% if account %}
+            <label class="check full">
+                <input type="checkbox" name="is_active" value="1" {{ account.active ? 'checked' : '' }}>
+                Активен
+            </label>
+        {% endif %}
+
+        <div class="actions full">
+            <button class="btn btn-primary" type="submit">Сохранить</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

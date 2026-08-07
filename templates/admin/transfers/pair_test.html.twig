@@ -1,0 +1,80 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block title %}Pair-test — Coinwire{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <h1>Pair-test</h1>
+        <p>Купить на sender → выставить → снайпить на receiver. Задача уходит в worker.</p>
+    </div>
+</header>
+
+<section class="panel">
+    <form method="post" class="form-grid">
+        <input type="hidden" name="_token" value="{{ csrf_token('pair_test') }}">
+
+        <label class="field">
+            Sender
+            <select name="sender" required>
+                <option value="">—</option>
+                {% for a in accounts %}
+                    <option value="{{ a.id }}">{{ a.email }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label class="field">
+            Receiver
+            <select name="receiver" required>
+                <option value="">—</option>
+                {% for a in accounts %}
+                    <option value="{{ a.id }}">{{ a.email }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label class="field">
+            Buy max
+            <input type="number" name="buy_max" value="2500" min="150" required>
+        </label>
+
+        <label class="field">
+            List price
+            <input type="number" name="list_price" value="2249" min="150" required>
+        </label>
+
+        <label class="field">
+            Futbin ID (опционально)
+            <input type="number" name="player_id" min="1" placeholder="если не --any">
+        </label>
+
+        <label class="field">
+            Имя игрока (опционально)
+            <input type="text" name="player_name" placeholder="Henderson">
+        </label>
+
+        <label class="check full">
+            <input type="checkbox" name="buy_any" value="1" checked>
+            Купить любую карточку до buy-max
+        </label>
+
+        <label class="check full">
+            <input type="checkbox" name="buy_first" value="1" checked>
+            Сначала купить (снять — только list из unassigned)
+        </label>
+
+        <div class="actions full">
+            <button class="btn btn-primary" type="submit">Поставить в очередь</button>
+        </div>
+    </form>
+</section>
+
+<section class="panel">
+    <h3>Важно</h3>
+    <p style="color:var(--muted);margin:0;line-height:1.55">
+        Нужен запущенный worker (<code>make worker</code>). У аккаунтов должны быть рабочие browser-профили
+        (кнопка Login на странице аккаунтов). Аккаунт с баном Transfer Market снайпить не сможет.
+    </p>
+</section>
+{% endblock %}

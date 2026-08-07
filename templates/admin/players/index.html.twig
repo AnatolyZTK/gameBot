@@ -1,0 +1,82 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block title %}Игроки — Coinwire{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <h1>Игроки</h1>
+        <p>Избранные карточки для плана перевода и снайпа.</p>
+    </div>
+</header>
+
+<section class="panel">
+    <h3>Добавить / обновить по Futbin ID</h3>
+    <form method="post" action="{{ path('admin_players_add') }}" class="form-grid">
+        <input type="hidden" name="_token" value="{{ csrf_token('player_add') }}">
+        <label class="field">
+            Futbin ID
+            <input type="number" name="futbin_id" required min="1" placeholder="231747">
+        </label>
+        <label class="field">
+            Имя (если нет sync)
+            <input type="text" name="name" placeholder="Kylian Mbappé">
+        </label>
+        <label class="check full">
+            <input type="checkbox" name="favorite" value="1" checked>
+            Сразу в избранное
+        </label>
+        <div class="actions full">
+            <button class="btn btn-primary" type="submit">Сохранить</button>
+        </div>
+    </form>
+</section>
+
+<section class="panel">
+    {% if players is empty %}
+        <div class="empty">Игроков нет. Добавьте Futbin ID или импортируйте fixture.</div>
+    {% else %}
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>Имя</th>
+                    <th>Futbin</th>
+                    <th>PS</th>
+                    <th>Xbox</th>
+                    <th>PC</th>
+                    <th>Избранное</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for p in players %}
+                    <tr>
+                        <td>{{ p.name }}</td>
+                        <td class="mono">{{ p.futbinId }}</td>
+                        <td class="mono">{{ p.pricePs is not null ? p.pricePs|number_format(0, '.', ' ') : '—' }}</td>
+                        <td class="mono">{{ p.priceXbox is not null ? p.priceXbox|number_format(0, '.', ' ') : '—' }}</td>
+                        <td class="mono">{{ p.pricePc is not null ? p.pricePc|number_format(0, '.', ' ') : '—' }}</td>
+                        <td>
+                            {% if p.favorite %}
+                                <span class="badge badge-lime">yes</span>
+                            {% else %}
+                                <span class="badge badge-mute">no</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <form method="post" action="{{ path('admin_players_favorite', {id: p.id}) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('player_fav_' ~ p.id) }}">
+                                <button class="btn btn-ghost btn-sm" type="submit">
+                                    {{ p.favorite ? 'Убрать' : 'В избранное' }}
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

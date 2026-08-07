@@ -26,4 +26,10 @@ final class AccountRepository extends ServiceEntityRepository
     {
         return $this->findBy(['isActive' => true], ['email' => 'ASC']);
     }
+
+    /** @return list<Account> */
+    public function findAllOrdered(): array
+    {
+        return $this->findBy([], ['email' => 'ASC']);
+    }
 }

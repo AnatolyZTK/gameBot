@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Coinwire{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('css/admin.css') }}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23070a09'/><circle cx='32' cy='32' r='16' fill='%23d4ff3a'/></svg>">
+    {% block stylesheets %}{% endblock %}
+</head>
+<body class="admin-body">
+{% set route = app.request.attributes.get('_route') %}
+<div class="admin-shell">
+    <aside class="admin-nav">
+        <a class="brand" href="{{ path('admin_dashboard') }}">Coin<span>wire</span></a>
+        <p class="brand-tag">FUT ops desk</p>
+        <ul class="nav-list">
+            <li><a href="{{ path('admin_dashboard') }}" class="{{ route == 'admin_dashboard' ? 'is-active' : '' }}">Обзор</a></li>
+            <li><a href="{{ path('admin_accounts') }}" class="{{ route starts with 'admin_accounts' ? 'is-active' : '' }}">Аккаунты</a></li>
+            <li><a href="{{ path('admin_players') }}" class="{{ route starts with 'admin_players' ? 'is-active' : '' }}">Игроки</a></li>
+            <li><a href="{{ path('admin_transfers') }}" class="{{ route starts with 'admin_transfers' ? 'is-active' : '' }}">Переводы</a></li>
+            <li><a href="{{ path('admin_pair_test') }}" class="{{ route == 'admin_pair_test' ? 'is-active' : '' }}">Pair-test</a></li>
+        </ul>
+    </aside>
+
+    <main class="admin-main">
+        {% for label, messages in app.flashes %}
+            {% for message in messages %}
+                <div class="flash flash-{{ label }}">{{ message }}</div>
+            {% endfor %}
+        {% endfor %}
+
+        {% block content %}{% endblock %}
+    </main>
+</div>
+{% block javascripts %}{% endblock %}
+</body>
+</html>

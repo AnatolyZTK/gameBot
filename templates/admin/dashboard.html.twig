@@ -1,0 +1,93 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block title %}Coinwire — обзор{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <h1>Пульт переводов</h1>
+        <p>Аккаунты EA, рынок и очередь снайпа — в одном месте.</p>
+    </div>
+    <div class="actions">
+        <a class="btn btn-primary" href="{{ path('admin_pair_test') }}">Pair-test</a>
+        <a class="btn btn-ghost" href="{{ path('admin_transfers_new') }}">Новый перевод</a>
+    </div>
+</header>
+
+<section class="hero-strip">
+    <div class="hero-brand">
+        <p class="eyebrow">ops console</p>
+        <h2>Coinwire</h2>
+        <p class="lede">Управляйте сессиями FUT, избранными карточками и переводами монет без CLI.</p>
+    </div>
+    <div class="stat-stack">
+        <div class="stat">
+            <span class="label">Аккаунты</span>
+            <div class="value">{{ accountsCount }}</div>
+        </div>
+        <div class="stat">
+            <span class="label">Избранные игроки</span>
+            <div class="value">{{ favoritesCount }}</div>
+        </div>
+        <div class="stat">
+            <span class="label">Монеты (сумма балансов)</span>
+            <div class="value mono">{{ totalBalance|number_format(0, '.', ' ') }}</div>
+        </div>
+    </div>
+</section>
+
+<section class="panel">
+    <h2>Быстрые действия</h2>
+    <div class="quick-grid">
+        <a class="quick-link" href="{{ path('admin_accounts_new') }}">
+            <strong>Добавить аккаунт</strong>
+            <span>Email, TOTP, прокси</span>
+        </a>
+        <a class="quick-link" href="{{ path('admin_players') }}">
+            <strong>Игроки Futbin</strong>
+            <span>Избранное и цены</span>
+        </a>
+        <a class="quick-link" href="{{ path('admin_pair_test') }}">
+            <strong>Sell → Snipe</strong>
+            <span>Тест передачи карточки</span>
+        </a>
+    </div>
+</section>
+
+<section class="panel">
+    <h2>Последние переводы</h2>
+    {% if recentTransfers is empty %}
+        <div class="empty">Переводов пока нет.</div>
+    {% else %}
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>Статус</th>
+                    <th>Sender</th>
+                    <th>Receiver</th>
+                    <th>Сумма</th>
+                    <th>Когда</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for t in recentTransfers %}
+                    <tr>
+                        <td>
+                            {% set s = t.status.value %}
+                            <span class="badge {{ s == 'completed' ? 'badge-ok' : (s == 'failed' ? 'badge-err' : (s == 'executing' ? 'badge-warn' : 'badge-mute')) }}">{{ s }}</span>
+                        </td>
+                        <td>{{ t.senderAccount ? t.senderAccount.email : '—' }}</td>
+                        <td>{{ t.receiverAccount.email }}</td>
+                        <td class="mono">{{ t.targetAmount|number_format(0, '.', ' ') }}</td>
+                        <td class="mono">{{ t.createdAt|date('d.m H:i') }}</td>
+                        <td><a class="btn btn-ghost btn-sm" href="{{ path('admin_transfers_show', {id: t.id}) }}">Открыть</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

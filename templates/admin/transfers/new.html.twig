@@ -1,0 +1,110 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block title %}Новый перевод — Coinwire{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <h1>Новый перевод</h1>
+        <p>Сначала план, затем постановка в очередь worker.</p>
+    </div>
+    <a class="btn btn-ghost" href="{{ path('admin_transfers') }}">К списку</a>
+</header>
+
+<section class="panel">
+    <form method="post" class="form-grid">
+        <input type="hidden" name="_token" value="{{ csrf_token('transfer_new') }}">
+
+        <label class="field">
+            Получатель
+            <select name="receiver" required>
+                <option value="">—</option>
+                {% for a in accounts %}
+                    <option value="{{ a.id }}" {% if selectedReceiver == a.id.toRfc4122 %}selected{% endif %}>{{ a.email }} ({{ a.platform.value }})</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label class="field">
+            Отправитель (опционально)
+            <select name="sender">
+                <option value="">auto</option>
+                {% for a in accounts %}
+                    <option value="{{ a.id }}" {% if selectedSender == a.id.toRfc4122 %}selected{% endif %}>{{ a.email }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label class="field">
+            Сумма (coins)
+            <input type="number" name="amount" required min="1" value="{{ amount|default(50000) }}">
+        </label>
+
+        <div class="actions full">
+            <button class="btn btn-ghost" type="submit" name="action" value="plan">Рассчитать план</button>
+            <button class="btn btn-primary" type="submit" name="action" value="run">Запустить в очередь</button>
+        </div>
+    </form>
+</section>
+
+{% if plan %}
+<section class="panel">
+    <h2>План</h2>
+    <p>Цель: <strong class="mono">{{ plan.targetAmount|number_format(0, '.', ' ') }}</strong> · оценка прибыли: <strong class="mono">{{ plan.estimatedProfit|number_format(0, '.', ' ') }}</strong></p>
+
+    {% if plan.steps is not empty %}
+        <div class="table-wrap" style="margin-top:16px">
+            <table class="data">
+                <thead><tr><th>#</th><th>List</th><th>Net</th></tr></thead>
+                <tbody>
+                {% for step in plan.steps %}
+                    <tr>
+                        <td>{{ step.step }}</td>
+                        <td class="mono">{{ step.listPrice|number_format(0, '.', ' ') }}</td>
+                        <td class="mono">{{ step.netProceeds|number_format(0, '.', ' ') }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+    {% if plan.players is defined and plan.players is not empty %}
+        <div class="table-wrap" style="margin-top:16px">
+            <table class="data">
+                <thead><tr><th>Игрок</th><th>Buy</th><th>List</th><th>Profit</th></tr></thead>
+                <tbody>
+                {% for p in plan.players %}
+                    <tr>
+                        <td>{{ p.name }}</td>
+                        <td class="mono">{{ p.buyPrice|number_format(0, '.', ' ') }}</td>
+                        <td class="mono">{{ p.listPrice|number_format(0, '.', ' ') }}</td>
+                        <td class="mono">{{ p.estimatedProfit|number_format(0, '.', ' ') }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty" style="margin-top:16px">Нет избранных игроков с ценами.</div>
+    {% endif %}
+
+    {% if plan.senders is defined and plan.senders is not empty %}
+        <div class="table-wrap" style="margin-top:16px">
+            <table class="data">
+                <thead><tr><th>Sender</th><th>Осталось продаж</th><th>Can send</th></tr></thead>
+                <tbody>
+                {% for s in plan.senders %}
+                    <tr>
+                        <td>{{ s.email }}</td>
+                        <td>{{ s.remainingSales }}</td>
+                        <td>{{ s.canSend ? 'yes' : 'no' }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</section>
+{% endif %}
+{% endblock %}

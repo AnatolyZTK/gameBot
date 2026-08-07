@@ -1,0 +1,63 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block title %}Аккаунты — Coinwire{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <h1>Аккаунты</h1>
+        <p>Credentials, прокси и cooldown для каждого EA-профиля.</p>
+    </div>
+    <a class="btn btn-primary" href="{{ path('admin_accounts_new') }}">Добавить</a>
+</header>
+
+<section class="panel">
+    {% if accounts is empty %}
+        <div class="empty">Аккаунтов нет. Добавьте первый.</div>
+    {% else %}
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Платформа</th>
+                    <th>Прокси</th>
+                    <th>Баланс</th>
+                    <th>Статус</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for a in accounts %}
+                    {% set proxyHost = '—' %}
+                    {% if a.proxyUrl %}
+                        {% set parts = a.proxyUrl|split('@') %}
+                        {% set proxyHost = parts|length > 1 ? parts[1] : a.proxyUrl %}
+                    {% endif %}
+                    <tr>
+                        <td>{{ a.email }}</td>
+                        <td><span class="badge badge-lime">{{ a.platform.value }}</span></td>
+                        <td class="mono">{{ proxyHost }}</td>
+                        <td class="mono">{{ a.balance is not null ? a.balance|number_format(0, '.', ' ') : '—' }}</td>
+                        <td>
+                            {% if a.active %}
+                                <span class="badge badge-ok">active</span>
+                            {% else %}
+                                <span class="badge badge-mute">off</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions">
+                            <a class="btn btn-ghost btn-sm" href="{{ path('admin_accounts_edit', {id: a.id}) }}">Изменить</a>
+                            <form method="post" action="{{ path('admin_accounts_login', {id: a.id}) }}" style="display:inline">
+                                <input type="hidden" name="_token" value="{{ csrf_token('account_login_' ~ a.id) }}">
+                                <button class="btn btn-primary btn-sm" type="submit">Login</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

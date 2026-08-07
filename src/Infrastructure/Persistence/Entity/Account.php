@@ -136,6 +136,18 @@ class Account
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    public function setActive(bool $isActive): void
+    {
+        $this->isActive = $isActive;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function setPlatform(Platform $platform): void
+    {
+        $this->platform = $platform;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     public function applyCooldown(\DateTimeImmutable $until): void
     {
         $this->cooldownUntil = $until;

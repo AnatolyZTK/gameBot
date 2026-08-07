@@ -1,0 +1,51 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block title %}Переводы — Coinwire{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <h1>Переводы</h1>
+        <p>Планы и статусы coin-transfer через рынок.</p>
+    </div>
+    <a class="btn btn-primary" href="{{ path('admin_transfers_new') }}">Новый перевод</a>
+</header>
+
+<section class="panel">
+    {% if transfers is empty %}
+        <div class="empty">Переводов пока нет.</div>
+    {% else %}
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Статус</th>
+                    <th>Sender</th>
+                    <th>Receiver</th>
+                    <th>Сумма</th>
+                    <th>Создан</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for t in transfers %}
+                    <tr>
+                        <td class="mono">{{ t.id.toRfc4122|slice(0, 8) }}…</td>
+                        <td>
+                            {% set s = t.status.value %}
+                            <span class="badge {{ s == 'completed' ? 'badge-ok' : (s == 'failed' ? 'badge-err' : (s == 'executing' ? 'badge-warn' : 'badge-mute')) }}">{{ s }}</span>
+                        </td>
+                        <td>{{ t.senderAccount ? t.senderAccount.email : '—' }}</td>
+                        <td>{{ t.receiverAccount.email }}</td>
+                        <td class="mono">{{ t.targetAmount|number_format(0, '.', ' ') }}</td>
+                        <td class="mono">{{ t.createdAt|date('Y-m-d H:i') }}</td>
+                        <td><a class="btn btn-ghost btn-sm" href="{{ path('admin_transfers_show', {id: t.id}) }}">Детали</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

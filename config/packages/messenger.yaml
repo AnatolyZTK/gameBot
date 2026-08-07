@@ -16,3 +16,5 @@ framework:
             App\Application\Scraping\Message\ScrapePageMessage: async
             App\Application\Scraping\Message\ProcessParsedDataMessage: async
             App\Application\Transfer\Message\ExecuteTransferMessage: async
+            App\Application\Transfer\Message\LoginAccountMessage: async
+            App\Application\Transfer\Message\PairTestMessage: async
