@@ -1,0 +1,160 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block title %}Логи — Coinwire{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <h1>Консоль</h1>
+        <p>Живой хвост <code>var/log/scraping.log</code> — login, pair-test, снайп.</p>
+    </div>
+    <div class="actions">
+        <button type="button" class="btn btn-ghost" id="log-pause">Пауза</button>
+        <button type="button" class="btn btn-ghost" id="log-clear">Очистить экран</button>
+        <button type="button" class="btn btn-primary" id="log-bottom">Вниз</button>
+    </div>
+</header>
+
+<section class="panel console-panel">
+    <div class="console-toolbar">
+        <div class="console-meta">
+            <span class="badge badge-lime" id="log-status">live</span>
+            <span class="mono" id="log-path">var/log/scraping.log</span>
+            <span class="mono muted" id="log-size">{{ snapshot.exists ? (snapshot.size ~ ' B') : 'missing' }}</span>
+        </div>
+        <label class="console-follow check">
+            <input type="checkbox" id="log-follow" checked>
+            Follow
+        </label>
+    </div>
+
+    <div class="console-window" id="log-console" aria-live="polite">
+        {% if not snapshot.exists %}
+            <div class="console-line level-warn">Файл scraping.log пока не создан.</div>
+        {% else %}
+            {% for line in snapshot.lines %}
+                <div class="console-line">{{ line }}</div>
+            {% endfor %}
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block javascripts %}
+<script>
+(() => {
+  const consoleEl = document.getElementById('log-console');
+  const statusEl = document.getElementById('log-status');
+  const sizeEl = document.getElementById('log-size');
+  const pauseBtn = document.getElementById('log-pause');
+  const clearBtn = document.getElementById('log-clear');
+  const bottomBtn = document.getElementById('log-bottom');
+  const followEl = document.getElementById('log-follow');
+  const streamUrl = {{ path('admin_logs_stream')|json_encode|raw }};
+
+  let offset = {{ snapshot.offset|default(0) }};
+  let paused = false;
+  let timer = null;
+  const maxDomLines = 800;
+
+  const levelClass = (line) => {
+    if (/\.ERROR:|\bERROR\b/.test(line)) return 'level-error';
+    if (/\.WARNING:|\bWARNING\b/.test(line)) return 'level-warn';
+    if (/\.INFO:|\bINFO\b/.test(line)) return 'level-info';
+    if (/\.DEBUG:|\bDEBUG\b/.test(line)) return 'level-debug';
+    return '';
+  };
+
+  const paintExisting = () => {
+    consoleEl.querySelectorAll('.console-line').forEach((el) => {
+      const cls = levelClass(el.textContent || '');
+      if (cls) el.classList.add(cls);
+    });
+    if (followEl.checked) {
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+  };
+
+  const appendLines = (lines) => {
+    if (!lines || !lines.length) return;
+    const frag = document.createDocumentFragment();
+    lines.forEach((line) => {
+      const row = document.createElement('div');
+      row.className = ('console-line ' + levelClass(line)).trim();
+      row.textContent = line;
+      frag.appendChild(row);
+    });
+    consoleEl.appendChild(frag);
+
+    const nodes = consoleEl.querySelectorAll('.console-line');
+    if (nodes.length > maxDomLines) {
+      const removeCount = nodes.length - maxDomLines;
+      for (let i = 0; i < removeCount; i++) nodes[i].remove();
+    }
+
+    if (followEl.checked) {
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+  };
+
+  const formatSize = (bytes) => {
+    if (bytes == null) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  };
+
+  const setStatus = (text, kind) => {
+    statusEl.textContent = text;
+    statusEl.className = 'badge badge-' + kind;
+  };
+
+  const poll = async () => {
+    if (paused) return;
+    try {
+      const url = streamUrl + '?offset=' + encodeURIComponent(String(offset)) + '&lines=200';
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      sizeEl.textContent = data.exists ? formatSize(data.size) : 'missing';
+
+      // ротация / усечение лога
+      if (typeof data.size === 'number' && data.size < offset) {
+        offset = 0;
+        consoleEl.innerHTML = '';
+      }
+
+      if (Array.isArray(data.lines) && data.lines.length) {
+        appendLines(data.lines);
+      }
+      if (typeof data.offset === 'number') {
+        offset = data.offset;
+      }
+      setStatus(paused ? 'paused' : 'live', paused ? 'warn' : 'lime');
+    } catch (err) {
+      setStatus('error', 'err');
+    }
+  };
+
+  pauseBtn.addEventListener('click', () => {
+    paused = !paused;
+    pauseBtn.textContent = paused ? 'Продолжить' : 'Пауза';
+    setStatus(paused ? 'paused' : 'live', paused ? 'warn' : 'lime');
+    if (!paused) poll();
+  });
+
+  clearBtn.addEventListener('click', () => {
+    consoleEl.innerHTML = '';
+  });
+
+  bottomBtn.addEventListener('click', () => {
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+    followEl.checked = true;
+  });
+
+  paintExisting();
+  timer = setInterval(poll, 2000);
+  window.addEventListener('beforeunload', () => clearInterval(timer));
+})();
+</script>
+{% endblock %}

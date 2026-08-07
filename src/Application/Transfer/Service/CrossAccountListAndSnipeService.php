@@ -78,8 +78,9 @@ final class CrossAccountListAndSnipeService
                             number_format($buyMaxPrice, 0, '.', ' '),
                         ));
                     }
+                    // Имя может быть пустым — выставим карточку с экрана покупки, имя дочитаем после
                     if (!is_string($playerName) || $playerName === '') {
-                        throw new \RuntimeException('Карточка куплена, но имя игрока не распознано.');
+                        $playerName = 'Bought card';
                     }
                     $resolvedPlayer = $this->playerResolver->resolveOrCreateByName($playerName);
                 } else {
@@ -101,6 +102,8 @@ final class CrossAccountListAndSnipeService
                 throw new \RuntimeException('Игрок для листинга не определён.');
             }
 
+            $listPrice = MathService::roundUpToValidBin($listPrice);
+
             $listed = $this->marketBrowser->sellForMinPrice($session, $resolvedPlayer, $listPrice);
             if (!$listed) {
                 throw new \RuntimeException(sprintf(
@@ -108,6 +111,13 @@ final class CrossAccountListAndSnipeService
                     $resolvedPlayer->getName(),
                     number_format($listPrice, 0, '.', ' '),
                 ));
+            }
+
+            // Уточнить имя после листинга (если было placeholder)
+            $betterName = $this->marketBrowser->readListedOrSelectedName($session);
+            if (is_string($betterName) && $betterName !== '' && $betterName !== $resolvedPlayer->getName()) {
+                $resolvedPlayer = $this->playerResolver->resolveOrCreateByName($betterName);
+                $playerName = $betterName;
             }
 
             $coinsAfter = $this->marketBrowser->getCoins($session);
@@ -121,13 +131,16 @@ final class CrossAccountListAndSnipeService
                 'listed' => $listed,
                 'player' => $resolvedPlayer,
                 'playerName' => $resolvedPlayer->getName(),
+                'listPrice' => $listPrice,
             ];
         });
 
         /** @var Player $listedPlayer */
         $listedPlayer = $senderResult['player'];
+        $listPrice = (int) ($senderResult['listPrice'] ?? MathService::roundUpToValidBin($listPrice));
 
-        usleep(1_500_000);
+        // Дать рынку время проиндексировать лот
+        usleep(3_500_000);
 
         $receiverResult = $this->sessionFactory->withAccount($receiver, function ($session) use ($receiver, $listedPlayer, $listPrice): array {
             $coinsBefore = $this->marketBrowser->getCoins($session);

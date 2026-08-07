@@ -99,7 +99,16 @@ final class TransferPairTestCommand extends Command
                 $buyAny,
             );
         } catch (\Throwable $exception) {
-            $io->error($exception->getMessage());
+            $io->error(sprintf(
+                '[%s] %s in %s:%d',
+                $exception::class,
+                $exception->getMessage() !== '' ? $exception->getMessage() : '(empty message)',
+                $exception->getFile(),
+                $exception->getLine(),
+            ));
+            if ($output->isVerbose()) {
+                $io->writeln($exception->getTraceAsString());
+            }
 
             return Command::FAILURE;
         }

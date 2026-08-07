@@ -68,6 +68,10 @@ services:
         arguments:
             $profilesDir: '%app.browser_profiles_dir%'
 
+    App\Infrastructure\Log\ScrapingLogReader:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+
     App\Infrastructure\Search\Manticore\ManticoreClientFactory:
         arguments:
             $host: '%app.manticore.host%'

@@ -131,25 +131,25 @@ final class TransferOrchestrator
      */
     private function buildPlayerPlan(array $players, Platform $platform, array $amountSteps): array
     {
-        if ($players === []) {
-            return [];
-        }
-
         $plan = [];
         foreach ($amountSteps as $index => $step) {
-            $player = $players[$index % count($players)];
-            $marketPrice = $this->resolvePlayerPrice($player, $platform);
-            if ($marketPrice === null) {
-                continue;
-            }
+            $listPrice = (int) $step['listPrice'];
 
+            // Надёжный bridge как pair-test: дешёвая покупка → листинг на сумму перевода → снайп.
+            // Named flip (Mbappé и т.п.) слишком хрупкий для UI-поиска и разоряет sender.
+            $buyMax = min(12_000, max(2_000, (int) floor($listPrice * 0.08)));
             $plan[] = [
-                'futbinId' => $player->getFutbinId(),
-                'name' => $player->getName(),
-                'buyPrice' => $marketPrice,
-                'listPrice' => $step['listPrice'],
+                'mode' => 'any',
+                'futbinId' => null,
+                'name' => 'any ≤ '.$buyMax,
+                'buyPrice' => $buyMax,
+                'buyMax' => $buyMax,
+                'listPrice' => $listPrice,
                 'expectedNet' => $step['netProceeds'],
-                'estimatedProfit' => $this->mathService->estimateProfit($marketPrice, $step['listPrice']),
+                'estimatedProfit' => 0,
+                // Кто листит получает net; для перевода «на receiver» листит receiver.
+                'lister' => 'receiver',
+                'sniper' => 'sender',
             ];
         }
 
