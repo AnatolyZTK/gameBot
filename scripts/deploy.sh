@@ -64,6 +64,18 @@ if [ "${APP_ENV:-dev}" = "prod" ] && grep -q '^APP_SECRET=change_me' .env 2>/dev
     set_env_var APP_SECRET "$(gen_secret)" .env
 fi
 
+# Перечитать после генерации, синхронизировать DATABASE_URL
+set -a
+source .env 2>/dev/null || true
+set +a
+
+DB_USER="${MYSQL_USER:-app}"
+DB_PASS="${MYSQL_PASSWORD}"
+DB_NAME="${MYSQL_DATABASE:-app}"
+COMPUTED_URL="mysql://${DB_USER}:${DB_PASS}@mysql:3306/${DB_NAME}?serverVersion=8.0.32&charset=utf8mb4"
+set_env_var DATABASE_URL "${COMPUTED_URL}" .env
+log "DATABASE_URL синхронизирован с MYSQL_USER/MYSQL_PASSWORD"
+
 log "Сборка образов (Chrome может качаться 5–10 минут)..."
 docker compose build php worker init
 
