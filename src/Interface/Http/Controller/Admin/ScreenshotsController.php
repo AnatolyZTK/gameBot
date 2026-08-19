@@ -13,9 +13,9 @@ final class ScreenshotsController extends AbstractController
 {
     private string $screenshotsDir;
 
-    public function __construct(string $projectDir)
+    public function __construct()
     {
-        $this->screenshotsDir = '/tmp/panther-error-screenshots';
+        $this->screenshotsDir = $_ENV['PANTHER_ERROR_SCREENSHOT_DIR'] ?? '/tmp/panther-error-screenshots';
     }
 
     #[Route('/admin/screenshots', name: 'admin_screenshots', methods: ['GET'])]
