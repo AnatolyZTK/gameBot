@@ -28,7 +28,14 @@ when@prod:
                 path: php://stderr
                 level: debug
             scraping:
+                type: group
+                members: [scraping_file, scraping_stderr]
+                channels: [scraping]
+            scraping_file:
+                type: stream
+                path: '%kernel.logs_dir%/scraping.log'
+                level: info
+            scraping_stderr:
                 type: stream
                 path: php://stderr
                 level: info
-                channels: [scraping]
