@@ -5,6 +5,38 @@ x-panther-env: &panther-env
   PANTHER_NO_SANDBOX: "1"
   PANTHER_ERROR_SCREENSHOT_DIR: /tmp/panther-error-screenshots
 
+x-php-build: &php-build
+  context: .
+  dockerfile: docker/php/Dockerfile
+  target: ${DOCKER_PHP_TARGET:-dev}
+
+x-php-volumes: &php-volumes
+  - ./:/var/www/html
+  - ./docker/php/conf.d/app.ini:/usr/local/etc/php/conf.d/99-app.ini:ro
+
+x-php-environment: &php-environment
+  <<: *panther-env
+  APP_ENV: ${APP_ENV:-dev}
+  APP_SECRET: ${APP_SECRET:-change_me_in_production}
+  DATABASE_URL: mysql://${MYSQL_USER:-app}:${MYSQL_PASSWORD:-app}@mysql:3306/${MYSQL_DATABASE:-app}?serverVersion=8.0.32&charset=utf8mb4
+  REDIS_URL: redis://redis:6379
+  MANTICORE_HOST: manticore
+  MANTICORE_PORT: 9308
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: ${S3_REGION:-us-east-1}
+  S3_BUCKET: ${S3_BUCKET:-app-storage}
+  S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+  S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+  S3_USE_PATH_STYLE: "true"
+
+x-php-service: &php-service
+  build: *php-build
+  shm_size: "2gb"
+  volumes: *php-volumes
+  environment: *php-environment
+  networks:
+    - app
+
 services:
   nginx:
     image: nginx:1.27-alpine
@@ -14,34 +46,24 @@ services:
       - ./:/var/www/html:ro
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - php
+      php:
+        condition: service_started
     networks:
       - app
 
-  php:
-    build:
-      context: .
-      dockerfile: docker/php/Dockerfile
-      target: dev
-    shm_size: "2gb"
-    volumes:
-      - ./:/var/www/html
-      - ./docker/php/conf.d/app.ini:/usr/local/etc/php/conf.d/99-app.ini:ro
-    environment:
-      <<: *panther-env
-      APP_ENV: ${APP_ENV:-dev}
-      APP_SECRET: ${APP_SECRET:-change_me_in_production}
-      DATABASE_URL: mysql://${MYSQL_USER:-app}:${MYSQL_PASSWORD:-app}@mysql:3306/${MYSQL_DATABASE:-app}?serverVersion=8.0.32
-      REDIS_URL: redis://redis:6379
-      MANTICORE_HOST: manticore
-      MANTICORE_PORT: 9308
-      S3_ENDPOINT: http://minio:9000
-      S3_REGION: ${S3_REGION:-us-east-1}
-      S3_BUCKET: ${S3_BUCKET:-app-storage}
-      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      S3_USE_PATH_STYLE: "true"
+  init:
+    <<: *php-service
+    command: ["/bin/sh", "/var/www/html/docker/php/init.sh"]
     depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
+
+  php:
+    <<: *php-service
+    depends_on:
+      init:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       redis:
@@ -50,60 +72,32 @@ services:
         condition: service_started
       minio:
         condition: service_started
-    networks:
-      - app
 
   worker:
-    build:
-      context: .
-      dockerfile: docker/php/Dockerfile
-      target: dev
-    shm_size: "2gb"
-    command: ["php", "bin/console", "messenger:consume", "async", "-vv", "--time-limit=3600", "--memory-limit=256M"]
-    volumes:
-      - ./:/var/www/html
-      - ./docker/php/conf.d/app.ini:/usr/local/etc/php/conf.d/99-app.ini:ro
-    environment:
-      <<: *panther-env
-      APP_ENV: ${APP_ENV:-dev}
-      APP_SECRET: ${APP_SECRET:-change_me_in_production}
-      DATABASE_URL: mysql://${MYSQL_USER:-app}:${MYSQL_PASSWORD:-app}@mysql:3306/${MYSQL_DATABASE:-app}?serverVersion=8.0.32
-      REDIS_URL: redis://redis:6379
-      MANTICORE_HOST: manticore
-      MANTICORE_PORT: 9308
-      S3_ENDPOINT: http://minio:9000
-      S3_REGION: ${S3_REGION:-us-east-1}
-      S3_BUCKET: ${S3_BUCKET:-app-storage}
-      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      S3_USE_PATH_STYLE: "true"
+    <<: *php-service
+    command: ["php", "bin/console", "messenger:consume", "async", "-vv", "--time-limit=3600", "--memory-limit=512M"]
     depends_on:
-      - php
-      - redis
+      init:
+        condition: service_completed_successfully
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: unless-stopped
-    networks:
-      - app
 
   scheduler:
-    build:
-      context: .
-      dockerfile: docker/php/Dockerfile
-      target: dev
+    <<: *php-service
     command: ["php", "bin/console", "scheduler:consume", "--time-limit=3600"]
-    volumes:
-      - ./:/var/www/html
-    environment:
-      APP_ENV: ${APP_ENV:-dev}
-      APP_SECRET: ${APP_SECRET:-change_me_in_production}
-      DATABASE_URL: mysql://${MYSQL_USER:-app}:${MYSQL_PASSWORD:-app}@mysql:3306/${MYSQL_DATABASE:-app}?serverVersion=8.0.32
-      REDIS_URL: redis://redis:6379
     depends_on:
-      - php
+      init:
+        condition: service_completed_successfully
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: unless-stopped
     profiles:
       - scheduler
-    networks:
-      - app
 
   mysql:
     # 8.4+ требует x86-64-v2 (SSE3/POPCNT); на старых CPU/VM — 8.0.32
@@ -183,15 +177,17 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
       S3_BUCKET: ${S3_BUCKET:-app-storage}
+    restart: "no"
     networks:
       - app
 
 ###> doctrine/doctrine-bundle ###
   database:
     image: postgres:${POSTGRES_VERSION:-16}-alpine
+    profiles:
+      - postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-app}
-      # You should definitely change the password in production
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-!ChangeMe!}
       POSTGRES_USER: ${POSTGRES_USER:-app}
     healthcheck:
@@ -201,8 +197,6 @@ services:
       start_period: 60s
     volumes:
       - database_data:/var/lib/postgresql/data:rw
-      # You may use a bind-mounted host directory instead, so that it is harder to accidentally remove the volume and lose all your data!
-      # - ./docker/db/data:/var/lib/postgresql/data:rw
 ###< doctrine/doctrine-bundle ###
 
 volumes:

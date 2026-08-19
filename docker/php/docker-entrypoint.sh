@@ -9,4 +9,10 @@ mkdir -p /tmp/.chromium-0 /tmp/.chromium-33 var/browser-profiles /tmp/panther-er
 chmod 0777 /tmp/.chromium-0 /tmp/.chromium-33 var/browser-profiles /tmp/panther-error-screenshots 2>/dev/null || true
 chown -R www-data:www-data var/browser-profiles /tmp/.chromium-33 2>/dev/null || true
 
+# Dev: том ./ смонтирован с хоста — vendor часто отсутствует до первого composer install
+if [ ! -f vendor/autoload.php ] && [ -f composer.json ]; then
+    echo "[entrypoint] vendor/ not found — running composer install..."
+    composer install --prefer-dist --no-interaction ${COMPOSER_FLAGS:-}
+fi
+
 exec docker-php-entrypoint "$@"
