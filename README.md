@@ -92,3 +92,26 @@ make transfer-plan     # план перевода (dry-run)
 sudo sysctl vm.overcommit_memory=1
 echo 'vm.overcommit_memory = 1' | sudo tee -a /etc/sysctl.conf
 ```
+
+### Порт 9000 занят (MinIO)
+
+В prod MinIO **не пробрасывается на хост** — приложение ходит на `http://minio:9000` внутри Docker. Обновите код и перезапустите:
+
+```bash
+git pull
+docker compose down
+docker compose up -d
+```
+
+Если ошибка остаётся на старой версии compose-файлов, временно смените порты в `.env`:
+
+```env
+MINIO_API_PORT=9010
+MINIO_CONSOLE_PORT=9011
+```
+
+Узнать, кто занял 9000:
+
+```bash
+sudo ss -tlnp | grep ':9000'
+```

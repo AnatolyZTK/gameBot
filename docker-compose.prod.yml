@@ -34,9 +34,8 @@ services:
 
   minio:
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
-      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    # !reset убирает ports из базового compose — MinIO только внутри Docker-сети
+    ports: !reset []
 
   manticore:
     restart: unless-stopped
