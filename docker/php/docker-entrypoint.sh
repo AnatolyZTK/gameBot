@@ -5,9 +5,10 @@ set -e
 git config --global --add safe.directory /var/www/html 2>/dev/null || true
 git config --global --add safe.directory '*' 2>/dev/null || true
 
-mkdir -p /tmp/.chromium-0 /tmp/.chromium-33 var/browser-profiles /tmp/panther-error-screenshots var/cache var/log
+mkdir -p /tmp/.chromium-0 /tmp/.chromium-33 var/browser-profiles /tmp/panther-error-screenshots \
+    var/cache/prod/http_cache var/cache/dev var/log var/sessions
 chmod 0777 /tmp/.chromium-0 /tmp/.chromium-33 var/browser-profiles /tmp/panther-error-screenshots 2>/dev/null || true
-chmod -R 777 var/cache var/log 2>/dev/null || true
+chmod -R 777 var/cache var/log var/sessions 2>/dev/null || true
 chown -R www-data:www-data var/browser-profiles /tmp/.chromium-33 2>/dev/null || true
 
 # Dev: том ./ смонтирован с хоста — vendor часто отсутствует до первого composer install
