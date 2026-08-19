@@ -1,0 +1,114 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block title %}Скриншоты ошибок — Coinwire{% endblock %}
+
+{% block stylesheets %}
+<style>
+.screenshots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+.screenshot-card {
+    background: var(--surface, #111);
+    border: 1px solid var(--border, #222);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.screenshot-card img {
+    width: 100%;
+    display: block;
+    cursor: pointer;
+    transition: opacity .15s;
+}
+.screenshot-card img:hover { opacity: .85; }
+.screenshot-meta {
+    padding: .75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+.screenshot-name {
+    font-size: .78rem;
+    font-family: monospace;
+    color: var(--muted, #888);
+    word-break: break-all;
+}
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.85);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+.modal-overlay.active { display: flex; }
+.modal-overlay img {
+    max-width: 95vw;
+    max-height: 95vh;
+    border-radius: 6px;
+    box-shadow: 0 8px 40px rgba(0,0,0,.6);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <h1>Скриншоты ошибок</h1>
+        <p>Папка: <code>{{ dir }}</code></p>
+    </div>
+    {% if files is not empty %}
+    <form method="post" action="{{ path('admin_screenshots_clear') }}"
+          onsubmit="return confirm('Удалить все скриншоты?')">
+        <button class="btn btn-ghost btn-sm" type="submit">Очистить все</button>
+    </form>
+    {% endif %}
+</header>
+
+{% if files is empty %}
+    <section class="panel">
+        <div class="empty">Скриншотов нет. Они появляются когда Chrome падает с ошибкой.</div>
+    </section>
+{% else %}
+    <div class="screenshots-grid">
+        {% for f in files %}
+        <div class="screenshot-card">
+            <img src="{{ path('admin_screenshots_view', {filename: f.name}) }}"
+                 alt="{{ f.name }}"
+                 onclick="openModal(this.src)">
+            <div class="screenshot-meta">
+                <div>
+                    <div class="screenshot-name">{{ f.name }}</div>
+                    <div class="screenshot-name">{{ (f.mtime * 1000)|date('d.m.Y H:i:s') }} · {{ (f.size / 1024)|round(1) }} KB</div>
+                </div>
+                <form method="post" action="{{ path('admin_screenshots_delete', {filename: f.name}) }}">
+                    <button class="btn btn-ghost btn-sm" type="submit">✕</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<div class="modal-overlay" id="modal" onclick="closeModal()">
+    <img id="modal-img" src="" alt="">
+</div>
+{% endblock %}
+
+{% block javascripts %}
+<script>
+function openModal(src) {
+    document.getElementById('modal-img').src = src;
+    document.getElementById('modal').classList.add('active');
+}
+function closeModal() {
+    document.getElementById('modal').classList.remove('active');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+{% endblock %}
