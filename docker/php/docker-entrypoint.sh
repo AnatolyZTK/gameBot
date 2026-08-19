@@ -17,4 +17,12 @@ if [ "${SKIP_COMPOSER:-0}" != "1" ] && [ ! -f vendor/autoload.php ] && [ -f comp
     composer install --prefer-dist --no-interaction --no-scripts ${COMPOSER_FLAGS:-}
 fi
 
+# Запустить Xvfb если нет дисплея (нужен для Chrome в worker)
+if [ -z "${DISPLAY:-}" ] && command -v Xvfb >/dev/null 2>&1; then
+    XVFB_DISPLAY="${XVFB_DISPLAY:-:99}"
+    Xvfb "$XVFB_DISPLAY" -screen 0 1280x1024x24 -nolisten tcp &
+    export DISPLAY="$XVFB_DISPLAY"
+    sleep 1
+fi
+
 exec docker-php-entrypoint "$@"
