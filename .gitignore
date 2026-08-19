@@ -43,6 +43,7 @@
 
 # Docker
 docker-compose.override.yml
+/docker/nginx/.htpasswd
 
 # Node
 node_modules/

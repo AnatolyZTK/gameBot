@@ -201,7 +201,17 @@ JS);
             usleep(250_000);
         }
 
-        throw new RuntimeException('Страница входа EA не загрузилась: '.$client->getCurrentURL());
+        $debugUrl = $client->getCurrentURL();
+        $debugHtml = '';
+        try {
+            $debugHtml = mb_substr((string) $client->getCrawler()->html(), 0, 2000);
+            $screenshotDir = $_ENV['PANTHER_ERROR_SCREENSHOT_DIR'] ?? '/tmp/panther-error-screenshots';
+            @mkdir($screenshotDir, 0777, true);
+            $client->takeScreenshot($screenshotDir.'/ea-login-timeout-'.date('His').'.png');
+        } catch (\Throwable) {
+        }
+        $this->logger->error('EA login page timeout', ['url' => $debugUrl, 'html_snippet' => $debugHtml]);
+        throw new RuntimeException('Страница входа EA не загрузилась: '.$debugUrl);
     }
 
     private function assertEaSigninPageIsReady(Client $client): void

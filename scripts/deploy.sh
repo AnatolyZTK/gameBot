@@ -76,6 +76,18 @@ COMPUTED_URL="mysql://${DB_USER}:${DB_PASS}@mysql:3306/${DB_NAME}?serverVersion=
 set_env_var DATABASE_URL "${COMPUTED_URL}" .env
 log "DATABASE_URL синхронизирован с MYSQL_USER/MYSQL_PASSWORD"
 
+if [ ! -f docker/nginx/.htpasswd ]; then
+    ADMIN_USER="${NGINX_AUTH_USER:-admin}"
+    ADMIN_PASS="${NGINX_AUTH_PASSWORD:-}"
+    if [ -z "$ADMIN_PASS" ]; then
+        ADMIN_PASS="$(gen_secret | cut -c1-16)"
+        log "Сгенерирован пароль для HTTP Basic Auth: пользователь=${ADMIN_USER}, пароль=${ADMIN_PASS}"
+        log "Сохраните пароль! Он больше не будет показан."
+    fi
+    printf '%s:%s\n' "$ADMIN_USER" "$(openssl passwd -apr1 "$ADMIN_PASS")" > docker/nginx/.htpasswd
+    log "Создан docker/nginx/.htpasswd"
+fi
+
 log "Сборка образов (Chrome может качаться 5–10 минут)..."
 docker compose build php worker init
 
