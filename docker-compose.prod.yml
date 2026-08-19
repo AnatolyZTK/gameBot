@@ -24,21 +24,17 @@ services:
 
   mysql:
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    # Только внутри Docker-сети — на хост не торчит
+    ports: !reset []
 
   redis:
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    ports: !reset []
 
   minio:
     restart: unless-stopped
-    # !reset убирает ports из базового compose — MinIO только внутри Docker-сети
     ports: !reset []
 
   manticore:
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:${MANTICORE_HTTP_PORT:-9308}:9308"
-      - "127.0.0.1:${MANTICORE_MYSQL_PORT:-9306}:9306"
+    ports: !reset []
