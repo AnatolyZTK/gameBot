@@ -143,14 +143,41 @@ JS;
 
     public function dismissBlockingOverlays(Client $client): void
     {
-        $client->executeScript(<<<'JS'
+        // Click-shield + промо-диалоги EA (Legacy Recap, Pre-order FC 27 и т.п.)
+        for ($pass = 0; $pass < 6; ++$pass) {
+            $dismissed = (bool) $client->executeScript(<<<'JS'
 document.querySelectorAll('.ui-orientation-warning').forEach((el) => el.remove());
 document.querySelectorAll('.ut-click-shield.showing').forEach((el) => {
   el.classList.remove('showing');
   el.style.pointerEvents = 'none';
   el.style.display = 'none';
 });
+
+const normalize = (el) => ((el.innerText || '') + ' ' + (el.getAttribute('aria-label') || ''))
+  .replace(/\s+/g, ' ').trim().toLowerCase();
+
+// Не жмём "Check it Out" / "Pre-order" — уводят со страницы. Предпочитаем Skip/Continue/Close.
+const dismissRe = /^(skip|continue|close|dismiss|not now|later|no thanks|got it|ok)$/i;
+const buttons = Array.from(document.querySelectorAll(
+  '.ea-dialog-view button, .view-modal-container button, .ut-livemessage button, button.btn-standard'
+)).filter((el) => {
+  const style = window.getComputedStyle(el);
+  return style.display !== 'none' && style.visibility !== 'hidden' && !el.disabled
+    && (el.offsetParent !== null || el.getClientRects().length > 0);
+});
+
+const btn = buttons.find((el) => dismissRe.test(normalize(el).trim()));
+if (!btn) return false;
+btn.click();
+return true;
 JS);
+
+            if (!$dismissed) {
+                break;
+            }
+
+            usleep(600_000);
+        }
     }
 
     public function isClickShieldVisible(Client $client): bool

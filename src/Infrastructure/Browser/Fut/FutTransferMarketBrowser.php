@@ -101,8 +101,11 @@ JS);
         $stuck = 0;
 
         for ($i = 0; $i < $maxItems; ++$i) {
-            $factory->dismissBlockingOverlays($client);
-            usleep(300_000);
+            // Закрыть Legacy Recap / Pre-order до любых кликов
+            for ($d = 0; $d < 4; ++$d) {
+                $factory->dismissBlockingOverlays($client);
+                usleep(400_000);
+            }
 
             $state = $client->executeScript(<<<'JS'
 const buttons = Array.from(document.querySelectorAll('button, .btn-standard, .ut-image-button-control'))
@@ -1454,10 +1457,11 @@ JS);
         $client = $session->client();
         $factory = $session->factory();
         $driver = $client->getWebDriver();
-        $deadline = microtime(true) + 5.0;
+        $deadline = microtime(true) + 8.0;
 
         while (microtime(true) < $deadline) {
             try {
+                // Сначала закрыть промо (Skip/Continue), иначе Ok покупки не виден
                 $factory->dismissBlockingOverlays($client);
             } catch (\Throwable) {
             }
@@ -1472,6 +1476,10 @@ JS);
                             continue;
                         }
                         $text = strtolower(trim(preg_replace('/\s+/u', ' ', (string) $button->getText()) ?: ''));
+                        // Continue = промо, не подтверждение покупки
+                        if ($text === 'continue' || $text === 'skip' || $text === 'check it out') {
+                            continue;
+                        }
                         if ($text !== 'ok' && $text !== 'yes' && $text !== 'confirm') {
                             continue;
                         }

@@ -44,7 +44,11 @@ final class FutWebAppSession
             );
         }
 
-        $browserFactory->dismissBlockingOverlays($client);
+        // Промо-модалки (Legacy Recap / Pre-order) часто всплывают сразу после входа
+        for ($i = 0; $i < 5; ++$i) {
+            $browserFactory->dismissBlockingOverlays($client);
+            usleep(700_000);
+        }
 
         return new self($client, $browserFactory, $account);
     }
