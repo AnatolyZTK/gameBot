@@ -143,41 +143,61 @@ JS;
 
     public function dismissBlockingOverlays(Client $client): void
     {
-        // Click-shield + промо-диалоги EA (Legacy Recap, Pre-order FC 27 и т.п.)
-        for ($pass = 0; $pass < 6; ++$pass) {
-            $dismissed = (bool) $client->executeScript(<<<'JS'
+        $client->executeScript(<<<'JS'
 document.querySelectorAll('.ui-orientation-warning').forEach((el) => el.remove());
 document.querySelectorAll('.ut-click-shield.showing').forEach((el) => {
   el.classList.remove('showing');
   el.style.pointerEvents = 'none';
   el.style.display = 'none';
 });
-
-const normalize = (el) => ((el.innerText || '') + ' ' + (el.getAttribute('aria-label') || ''))
-  .replace(/\s+/g, ' ').trim().toLowerCase();
-
-// Не жмём "Check it Out" / "Pre-order" — уводят со страницы. Предпочитаем Skip/Continue/Close.
-const dismissRe = /^(skip|continue|close|dismiss|not now|later|no thanks|got it|ok)$/i;
-const buttons = Array.from(document.querySelectorAll(
-  '.ea-dialog-view button, .view-modal-container button, .ut-livemessage button, button.btn-standard'
-)).filter((el) => {
-  const style = window.getComputedStyle(el);
-  return style.display !== 'none' && style.visibility !== 'hidden' && !el.disabled
-    && (el.offsetParent !== null || el.getClientRects().length > 0);
-});
-
-const btn = buttons.find((el) => dismissRe.test(normalize(el).trim()));
-if (!btn) return false;
-btn.click();
-return true;
 JS);
 
-            if (!$dismissed) {
+        // Нативный клик: JS click() на Continue/Skip EA часто игнорирует (1/5…5/5 промо)
+        $driver = $client->getWebDriver();
+        for ($pass = 0; $pass < 12; ++$pass) {
+            $clicked = false;
+
+            try {
+                foreach ($driver->findElements(WebDriverBy::cssSelector(
+                    '.ea-dialog-view button, .view-modal-container button, .ut-livemessage button, button.btn-standard'
+                )) as $button) {
+                    try {
+                        if (!$button->isDisplayed() || !$button->isEnabled()) {
+                            continue;
+                        }
+                        $text = strtolower(trim(preg_replace('/\s+/u', ' ', (string) $button->getText()) ?: ''));
+                        // Не трогаем Ok покупки и Check it Out (уводит со страницы)
+                        if (\in_array($text, ['skip', 'continue', 'close', 'dismiss', 'not now', 'later', 'no thanks', 'got it'], true)) {
+                            $button->click();
+                            $clicked = true;
+                            break;
+                        }
+                    } catch (\Throwable) {
+                        continue;
+                    }
+                }
+            } catch (\Throwable) {
+            }
+
+            if (!$clicked) {
                 break;
             }
 
-            usleep(600_000);
+            usleep(700_000);
         }
+    }
+
+    public function hasPromoDialog(Client $client): bool
+    {
+        return (bool) $client->executeScript(<<<'JS'
+const dialog = document.querySelector('.ea-dialog-view, .view-modal-container');
+if (!dialog) return false;
+const t = (dialog.innerText || '').toLowerCase();
+return /message from the fc team|legacy recap|pre-order|franco baresi|check it out/i.test(t)
+  || Array.from(dialog.querySelectorAll('button')).some((el) =>
+    /^(skip|continue)$/i.test((el.innerText || '').trim())
+  );
+JS);
     }
 
     public function isClickShieldVisible(Client $client): bool

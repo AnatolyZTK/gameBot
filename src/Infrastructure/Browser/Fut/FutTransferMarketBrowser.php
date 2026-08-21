@@ -271,6 +271,15 @@ JS);
                 if ($remainingNow <= 0) {
                     break;
                 }
+
+                // Промо ещё на экране — закрыть и повторить проход, не выходить
+                if ($factory->hasPromoDialog($client)) {
+                    $this->logger->info('Unassigned blocked by promo — dismissing', ['pass' => $i]);
+                    $factory->dismissBlockingOverlays($client);
+                    usleep(1_000_000);
+                    continue;
+                }
+
                 $this->logger->info('No Send to Club/Transfer List button', ['pass' => $i]);
                 break;
             }
@@ -398,7 +407,9 @@ JS);
 
     public function snipePlayer(FutWebAppSession $session, Player $player, Platform $platform, int $maxPrice): bool
     {
+        $session->factory()->dismissBlockingOverlays($session->client());
         $this->clearUnassignedItems($session);
+        $session->factory()->dismissBlockingOverlays($session->client());
         $binPrice = MathService::roundToValidBin($maxPrice);
         $candidatePrices = array_values(array_unique([
             $binPrice,
@@ -476,6 +487,18 @@ return {
 };
 JS);
                 $dialogText = is_array($afterBuy) ? (string) ($afterBuy['dialogText'] ?? '') : '';
+                if ($session->factory()->hasPromoDialog($session->client())
+                    && !preg_match('/are you sure you want to buy/i', $dialogText)) {
+                    $this->logger->info('Promo after snipe Buy Now — dismissing', [
+                        'dialogText' => mb_substr($dialogText, 0, 120),
+                    ]);
+                    $session->factory()->dismissBlockingOverlays($session->client());
+                    usleep(1_000_000);
+                    if (!$this->waitAndClickBuyNow($session, 4.0)) {
+                        return $this->buyFirstSearchResult($session, $maxPrice);
+                    }
+                    usleep(800_000);
+                }
                 if (preg_match('/unassigned items|new items full|cannot get this item/i', $dialogText)) {
                     $this->logger->warning('Unassigned pile full during snipe', ['dialogText' => $dialogText]);
                     $client->executeScript(<<<'JS'
@@ -1274,6 +1297,28 @@ JS);
             $this->logger->info('After Buy Now click', ['index' => $index, 'state' => $afterBuy]);
 
             $dialogText = is_array($afterBuy) ? (string) ($afterBuy['dialogText'] ?? '') : '';
+            $dialogButtons = is_array($afterBuy) ? ($afterBuy['buttons'] ?? []) : [];
+            $isPromo = $factory->hasPromoDialog($client)
+                || preg_match('/message from the fc team|legacy recap|pre-order|franco baresi/i', $dialogText)
+                || (is_array($dialogButtons) && array_intersect(
+                    array_map('strtolower', $dialogButtons),
+                    ['continue', 'skip']
+                ) !== []);
+
+            if ($isPromo && !preg_match('/are you sure you want to buy/i', $dialogText)) {
+                $this->logger->info('Promo dialog after Buy Now — dismissing and retrying buy', [
+                    'index' => $index,
+                    'dialogText' => mb_substr($dialogText, 0, 120),
+                ]);
+                $factory->dismissBlockingOverlays($client);
+                usleep(1_000_000);
+                // Повторный Buy Now после закрытия промо
+                if (!$this->waitAndClickBuyNow($session, 4.0)) {
+                    continue;
+                }
+                usleep(800_000);
+            }
+
             if (preg_match('/unassigned items|new items full|cannot get this item/i', $dialogText)) {
                 $this->logger->warning('Unassigned pile full during buy', ['dialogText' => $dialogText]);
                 $tookThere = false;
