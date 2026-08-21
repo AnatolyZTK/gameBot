@@ -18,6 +18,9 @@ mkdir -p \
 
 # a+rwX: и root (worker/chrome), и www-data (php-fpm) могут писать
 chmod -R a+rwX var /tmp/.chromium-0 /tmp/.chromium-33 2>/dev/null || true
+# Скриншоты часто создаёт root (worker) — php-fpm (www-data) должен читать
+chmod a+rX var/screenshots 2>/dev/null || true
+chmod a+r var/screenshots/*.png 2>/dev/null || true
 if command -v chown >/dev/null 2>&1; then
     chown -R www-data:www-data var 2>/dev/null || true
     # После chown снова открыть запись для root-worker/chrome

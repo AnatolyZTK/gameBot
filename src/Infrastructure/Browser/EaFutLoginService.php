@@ -212,7 +212,10 @@ JS);
                 $screenshotDir = dirname(__DIR__, 3).'/'.ltrim((string) $screenshotDir, './');
             }
             @mkdir($screenshotDir, 0777, true);
-            $client->takeScreenshot($screenshotDir.'/ea-login-timeout-'.date('His').'.png');
+            @chmod($screenshotDir, 0777);
+            $path = $screenshotDir.'/ea-login-timeout-'.date('His').'.png';
+            $client->takeScreenshot($path);
+            @chmod($path, 0666);
         } catch (\Throwable) {
         }
         $this->logger->error('EA login page timeout', ['url' => $debugUrl, 'html_snippet' => $debugHtml]);
@@ -269,7 +272,10 @@ JS);
                 $screenshotDir = dirname(__DIR__, 3).'/'.ltrim((string) $screenshotDir, './');
             }
             @mkdir($screenshotDir, 0777, true);
-            $client->takeScreenshot($screenshotDir.'/'.$tag.'-'.date('His').'.png');
+            @chmod($screenshotDir, 0777);
+            $path = $screenshotDir.'/'.$tag.'-'.date('His').'.png';
+            $client->takeScreenshot($path);
+            @chmod($path, 0666);
         } catch (\Throwable) {
         }
     }

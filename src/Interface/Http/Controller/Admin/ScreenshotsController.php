@@ -25,7 +25,6 @@ final class ScreenshotsController extends AbstractController
             ?? null;
 
         if (is_string($fromEnv) && $fromEnv !== '') {
-            // Относительный путь → от корня проекта
             if (!str_starts_with($fromEnv, '/')) {
                 return $this->projectDir.'/'.ltrim($fromEnv, './');
             }
@@ -41,17 +40,19 @@ final class ScreenshotsController extends AbstractController
     {
         $dir = $this->screenshotsDir();
         @mkdir($dir, 0777, true);
+        @chmod($dir, 0777);
 
         $files = [];
         if (is_dir($dir)) {
             $entries = glob($dir.'/*.png') ?: [];
-            usort($entries, static fn (string $a, string $b): int => filemtime($b) <=> filemtime($a));
+            usort($entries, static fn (string $a, string $b): int => (@filemtime($b) ?: 0) <=> (@filemtime($a) ?: 0));
 
             foreach ($entries as $path) {
+                @chmod($path, 0666);
                 $files[] = [
                     'name' => basename($path),
-                    'size' => filesize($path) ?: 0,
-                    'mtime' => filemtime($path) ?: 0,
+                    'size' => @filesize($path) ?: 0,
+                    'mtime' => @filemtime($path) ?: 0,
                 ];
             }
         }
@@ -83,11 +84,19 @@ final class ScreenshotsController extends AbstractController
     {
         $path = $this->screenshotsDir().'/'.$filename;
 
-        if (!is_file($path)) {
-            throw $this->createNotFoundException();
+        if (!is_file($path) || !is_readable($path)) {
+            @chmod($path, 0666);
         }
 
-        return new BinaryFileResponse($path);
+        if (!is_file($path) || !is_readable($path)) {
+            throw $this->createNotFoundException('Screenshot not readable: '.$filename);
+        }
+
+        $response = new BinaryFileResponse($path);
+        $response->headers->set('Content-Type', 'image/png');
+        $response->setContentDisposition('inline', $filename);
+
+        return $response;
     }
 
     #[Route('/admin/screenshots/{filename}/delete', name: 'admin_screenshots_delete', methods: ['POST'],
@@ -95,6 +104,7 @@ final class ScreenshotsController extends AbstractController
     public function delete(string $filename): Response
     {
         $path = $this->screenshotsDir().'/'.$filename;
+        @chmod($path, 0666);
 
         if (is_file($path)) {
             @unlink($path);
