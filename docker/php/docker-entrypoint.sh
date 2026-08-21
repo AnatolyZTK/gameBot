@@ -12,12 +12,12 @@ mkdir -p \
     var/log \
     var/sessions \
     var/browser-profiles \
+    var/screenshots \
     /tmp/.chromium-0 \
-    /tmp/.chromium-33 \
-    /tmp/panther-error-screenshots
+    /tmp/.chromium-33
 
 # a+rwX: и root (worker/chrome), и www-data (php-fpm) могут писать
-chmod -R a+rwX var /tmp/.chromium-0 /tmp/.chromium-33 /tmp/panther-error-screenshots 2>/dev/null || true
+chmod -R a+rwX var /tmp/.chromium-0 /tmp/.chromium-33 2>/dev/null || true
 if command -v chown >/dev/null 2>&1; then
     chown -R www-data:www-data var 2>/dev/null || true
     # После chown снова открыть запись для root-worker/chrome

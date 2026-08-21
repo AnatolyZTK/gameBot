@@ -5,49 +5,83 @@ declare(strict_types=1);
 namespace App\Interface\Http\Controller\Admin;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 final class ScreenshotsController extends AbstractController
 {
-    private string $screenshotsDir;
+    public function __construct(
+        #[Autowire('%kernel.project_dir%')]
+        private readonly string $projectDir,
+    ) {
+    }
 
-    public function __construct()
+    private function screenshotsDir(): string
     {
-        $this->screenshotsDir = $_ENV['PANTHER_ERROR_SCREENSHOT_DIR'] ?? '/tmp/panther-error-screenshots';
+        $fromEnv = $_ENV['PANTHER_ERROR_SCREENSHOT_DIR']
+            ?? $_SERVER['PANTHER_ERROR_SCREENSHOT_DIR']
+            ?? null;
+
+        if (is_string($fromEnv) && $fromEnv !== '') {
+            // Относительный путь → от корня проекта
+            if (!str_starts_with($fromEnv, '/')) {
+                return $this->projectDir.'/'.ltrim($fromEnv, './');
+            }
+
+            return $fromEnv;
+        }
+
+        return $this->projectDir.'/var/screenshots';
     }
 
     #[Route('/admin/screenshots', name: 'admin_screenshots', methods: ['GET'])]
     public function index(): Response
     {
-        $files = [];
+        $dir = $this->screenshotsDir();
+        @mkdir($dir, 0777, true);
 
-        if (is_dir($this->screenshotsDir)) {
-            $entries = glob($this->screenshotsDir.'/*.png') ?: [];
-            rsort($entries);
+        $files = [];
+        if (is_dir($dir)) {
+            $entries = glob($dir.'/*.png') ?: [];
+            usort($entries, static fn (string $a, string $b): int => filemtime($b) <=> filemtime($a));
 
             foreach ($entries as $path) {
                 $files[] = [
                     'name' => basename($path),
-                    'size' => filesize($path),
-                    'mtime' => filemtime($path),
-                    'path' => $path,
+                    'size' => filesize($path) ?: 0,
+                    'mtime' => filemtime($path) ?: 0,
                 ];
             }
         }
 
         return $this->render('admin/screenshots/index.html.twig', [
             'files' => $files,
-            'dir' => $this->screenshotsDir,
+            'dir' => $dir,
         ]);
+    }
+
+    #[Route('/admin/screenshots/clear', name: 'admin_screenshots_clear', methods: ['POST'])]
+    public function clear(): Response
+    {
+        $dir = $this->screenshotsDir();
+        if (is_dir($dir)) {
+            foreach (glob($dir.'/*.png') ?: [] as $file) {
+                @unlink($file);
+            }
+        }
+
+        $this->addFlash('success', 'Все скриншоты удалены');
+
+        return $this->redirectToRoute('admin_screenshots');
     }
 
     #[Route('/admin/screenshots/{filename}', name: 'admin_screenshots_view', methods: ['GET'],
         requirements: ['filename' => '[a-zA-Z0-9_\-\.]+\.png'])]
     public function view(string $filename): Response
     {
-        $path = $this->screenshotsDir.'/'.$filename;
+        $path = $this->screenshotsDir().'/'.$filename;
 
         if (!is_file($path)) {
             throw $this->createNotFoundException();
@@ -60,25 +94,11 @@ final class ScreenshotsController extends AbstractController
         requirements: ['filename' => '[a-zA-Z0-9_\-\.]+\.png'])]
     public function delete(string $filename): Response
     {
-        $path = $this->screenshotsDir.'/'.$filename;
+        $path = $this->screenshotsDir().'/'.$filename;
 
         if (is_file($path)) {
-            unlink($path);
+            @unlink($path);
         }
-
-        return $this->redirectToRoute('admin_screenshots');
-    }
-
-    #[Route('/admin/screenshots/clear', name: 'admin_screenshots_clear', methods: ['POST'])]
-    public function clear(): Response
-    {
-        if (is_dir($this->screenshotsDir)) {
-            foreach (glob($this->screenshotsDir.'/*.png') ?: [] as $file) {
-                unlink($file);
-            }
-        }
-
-        $this->addFlash('success', 'Все скриншоты удалены');
 
         return $this->redirectToRoute('admin_screenshots');
     }

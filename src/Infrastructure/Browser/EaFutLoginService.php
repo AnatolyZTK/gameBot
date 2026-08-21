@@ -205,7 +205,12 @@ JS);
         $debugHtml = '';
         try {
             $debugHtml = mb_substr((string) $client->getCrawler()->html(), 0, 2000);
-            $screenshotDir = $_ENV['PANTHER_ERROR_SCREENSHOT_DIR'] ?? '/tmp/panther-error-screenshots';
+            $screenshotDir = $_ENV['PANTHER_ERROR_SCREENSHOT_DIR']
+                ?? $_SERVER['PANTHER_ERROR_SCREENSHOT_DIR']
+                ?? dirname(__DIR__, 3).'/var/screenshots';
+            if (!str_starts_with((string) $screenshotDir, '/')) {
+                $screenshotDir = dirname(__DIR__, 3).'/'.ltrim((string) $screenshotDir, './');
+            }
             @mkdir($screenshotDir, 0777, true);
             $client->takeScreenshot($screenshotDir.'/ea-login-timeout-'.date('His').'.png');
         } catch (\Throwable) {
@@ -219,18 +224,53 @@ JS);
         $state = $client->executeScript(<<<'JS'
 const body = document.body?.innerText ?? '';
 return {
-  unreachable: /can\x27t be reached|ERR_ADDRESS_UNREACHABLE|не удается получить доступ/i.test(body),
+  unreachable: /can\x27t be reached|ERR_ADDRESS_UNREACHABLE|ERR_NO_SUPPORTED_PROXIES|ERR_PROXY|не удается получить доступ/i.test(body),
+  proxyError: /ERR_NO_SUPPORTED_PROXIES|ERR_PROXY_CONNECTION_FAILED|ERR_TUNNEL_CONNECTION_FAILED/i.test(body),
   eaError: /something went wrong|technical difficulties|пошло не по плану|технические проблемы/i.test(body),
+  snippet: body.replace(/\s+/g, ' ').trim().slice(0, 300),
 };
 JS);
         if (!is_array($state)) {
             return;
         }
+        if ($state['proxyError'] ?? false) {
+            $this->captureLoginDebug($client, 'proxy-error');
+            throw new RuntimeException(
+                'Прокси недоступен для Chrome (ERR_NO_SUPPORTED_PROXIES / proxy connection failed). '
+                .'Проверьте proxy_url аккаунта: http://user:pass@host:port'
+            );
+        }
         if ($state['unreachable'] ?? false) {
-            throw new RuntimeException('accounts.ea.com недоступен (прокси?).');
+            $this->captureLoginDebug($client, 'unreachable');
+            throw new RuntimeException('accounts.ea.com недоступен (прокси или сеть?).');
         }
         if ($state['eaError'] ?? false) {
-            throw new RuntimeException('EA отклонила OAuth-вход.');
+            $this->captureLoginDebug($client, 'ea-oauth-reject');
+            $snippet = is_string($state['snippet'] ?? null) ? (string) $state['snippet'] : '';
+            $this->logger->error('EA OAuth rejected', [
+                'url' => $client->getCurrentURL(),
+                'snippet' => $snippet,
+            ]);
+            throw new RuntimeException(
+                'EA отклонила OAuth-вход. Частые причины: плохой прокси/IP, слишком много попыток, '
+                .'битый browser-профиль. Скриншот: /admin/screenshots. '
+                .'Попробуйте очистить профиль и сменить/убрать прокси.'
+            );
+        }
+    }
+
+    private function captureLoginDebug(Client $client, string $tag): void
+    {
+        try {
+            $screenshotDir = $_ENV['PANTHER_ERROR_SCREENSHOT_DIR']
+                ?? $_SERVER['PANTHER_ERROR_SCREENSHOT_DIR']
+                ?? dirname(__DIR__, 3).'/var/screenshots';
+            if (!str_starts_with((string) $screenshotDir, '/')) {
+                $screenshotDir = dirname(__DIR__, 3).'/'.ltrim((string) $screenshotDir, './');
+            }
+            @mkdir($screenshotDir, 0777, true);
+            $client->takeScreenshot($screenshotDir.'/'.$tag.'-'.date('His').'.png');
+        } catch (\Throwable) {
         }
     }
 

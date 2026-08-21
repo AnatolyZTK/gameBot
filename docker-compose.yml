@@ -3,7 +3,8 @@ name: gameparser
 x-panther-env: &panther-env
   HOME: /tmp
   PANTHER_NO_SANDBOX: "1"
-  PANTHER_ERROR_SCREENSHOT_DIR: /tmp/panther-error-screenshots
+  # Общий volume app_var → и worker, и php видят скриншоты в админке
+  PANTHER_ERROR_SCREENSHOT_DIR: /var/www/html/var/screenshots
 
 x-php-build: &php-build
   context: .
