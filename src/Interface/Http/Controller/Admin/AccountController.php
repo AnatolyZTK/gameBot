@@ -6,6 +6,7 @@ namespace App\Interface\Http\Controller\Admin;
 
 use App\Application\Transfer\Message\LoginAccountMessage;
 use App\Domain\Transfer\Enum\Platform;
+use App\Infrastructure\Browser\BrowserProfileSnapshotStorage;
 use App\Infrastructure\Persistence\Entity\Account;
 use App\Infrastructure\Persistence\Repository\AccountRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -22,6 +23,7 @@ final class AccountController extends AbstractController
         private AccountRepository $accountRepository,
         private EntityManagerInterface $entityManager,
         private MessageBusInterface $messageBus,
+        private BrowserProfileSnapshotStorage $profileStorage,
     ) {
     }
 
@@ -129,6 +131,28 @@ final class AccountController extends AbstractController
 
         $this->messageBus->dispatch(new LoginAccountMessage($account->getId()->toRfc4122()));
         $this->addFlash('success', 'Логин поставлен в очередь: '.$account->getEmail().'. Смотрите worker / scraping.log');
+
+        return $this->redirectToRoute('admin_accounts');
+    }
+
+    #[Route('/admin/accounts/{id}/clear-profile', name: 'admin_accounts_clear_profile', methods: ['POST'])]
+    public function clearProfile(string $id, Request $request): Response
+    {
+        $account = $this->requireAccount($id);
+        if (!$this->isCsrfTokenValid('account_clear_profile_'.$account->getId()->toRfc4122(), (string) $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token');
+        }
+
+        $deleted = $this->profileStorage->deleteProfileForEmail($account->getEmail());
+        $account->markLoginUnknown('Профиль браузера очищен вручную');
+        $this->entityManager->flush();
+
+        $this->addFlash(
+            'success',
+            $deleted
+                ? 'Профиль Chrome очищен: '.$account->getEmail().'. Нажмите Login заново.'
+                : 'Профиль уже был пуст: '.$account->getEmail(),
+        );
 
         return $this->redirectToRoute('admin_accounts');
     }

@@ -155,6 +155,14 @@ class Account
         $this->updatedAt = $this->lastLoginAt;
     }
 
+    public function markLoginUnknown(?string $note = null): void
+    {
+        $this->loginStatus = LoginStatus::Unknown;
+        $this->lastLoginAt = new \DateTimeImmutable();
+        $this->lastLoginError = $note !== null ? mb_substr($note, 0, 2000) : null;
+        $this->updatedAt = $this->lastLoginAt;
+    }
+
     public function markLoginFailed(string $error): void
     {
         $this->loginStatus = LoginStatus::Failed;

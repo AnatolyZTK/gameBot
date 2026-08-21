@@ -103,6 +103,66 @@ final class BrowserProfileSnapshotStorage
         $this->makeWritable($this->profilesDir);
     }
 
+    /**
+     * Удаляет весь Chrome-профиль аккаунта (cookies / сессия EA).
+     */
+    public function deleteProfileForEmail(string $email): bool
+    {
+        $accountKey = $this->accountKeyFromEmail($email);
+        $root = $this->getProfileRoot($accountKey);
+
+        if (!is_dir($root)) {
+            return false;
+        }
+
+        // Профиль мог создать worker от root — открыть права перед удалением
+        if (\function_exists('posix_geteuid') && posix_geteuid() === 0) {
+            $target = escapeshellarg($root);
+            @exec('chmod -R a+rwX '.$target.' 2>/dev/null');
+            @exec('rm -rf '.$target.' 2>/dev/null');
+
+            return !is_dir($root);
+        }
+
+        @exec('chmod -R a+rwX '.escapeshellarg($root).' 2>/dev/null');
+        $this->removeDirectory($root);
+
+        if (is_dir($root)) {
+            // Fallback: rm -rf (php-fpm может не удалить root-файлы)
+            @exec('rm -rf '.escapeshellarg($root).' 2>/dev/null');
+        }
+
+        return !is_dir($root);
+    }
+
+    private function removeDirectory(string $directory): void
+    {
+        if (!is_dir($directory)) {
+            return;
+        }
+
+        $entries = @scandir($directory);
+        if ($entries === false) {
+            return;
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+
+            $path = $directory.'/'.$entry;
+            if (is_dir($path) && !is_link($path)) {
+                $this->removeDirectory($path);
+                continue;
+            }
+
+            @unlink($path);
+        }
+
+        @rmdir($directory);
+    }
+
     private function getProfileRoot(string $accountKey): string
     {
         if (!preg_match('/^[a-f0-9]{64}$/', $accountKey)) {

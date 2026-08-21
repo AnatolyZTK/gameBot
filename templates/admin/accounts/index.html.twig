@@ -67,6 +67,11 @@
                                 <input type="hidden" name="_token" value="{{ csrf_token('account_login_' ~ a.id) }}">
                                 <button class="btn btn-primary btn-sm" type="submit">Login</button>
                             </form>
+                            <form method="post" action="{{ path('admin_accounts_clear_profile', {id: a.id}) }}" style="display:inline"
+                                  onsubmit="return confirm('Очистить Chrome-профиль {{ a.email }}? Потребуется повторный Login.');">
+                                <input type="hidden" name="_token" value="{{ csrf_token('account_clear_profile_' ~ a.id) }}">
+                                <button class="btn btn-ghost btn-sm" type="submit">Очистить профиль</button>
+                            </form>
                         </td>
                     </tr>
                 {% endfor %}
