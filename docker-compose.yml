@@ -75,15 +75,15 @@ services:
 
   worker:
     <<: *php-service
-    command: ["php", "bin/console", "messenger:consume", "async", "-vv", "--time-limit=3600", "--memory-limit=512M"]
+    # Loop: messenger --time-limit иначе контейнер выходит через час и может не подняться
+    # без init — иначе после reboot worker ждёт one-shot init и часто не стартует
+    command: ["/bin/sh", "/var/www/html/docker/php/worker.sh"]
     depends_on:
-      init:
-        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       redis:
         condition: service_started
-    restart: unless-stopped
+    restart: always
 
   scheduler:
     <<: *php-service
