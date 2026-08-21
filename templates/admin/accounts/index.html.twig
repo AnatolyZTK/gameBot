@@ -23,6 +23,7 @@
                     <th>Платформа</th>
                     <th>Прокси</th>
                     <th>Баланс</th>
+                    <th>Логин</th>
                     <th>Статус</th>
                     <th></th>
                 </tr>
@@ -39,6 +40,20 @@
                         <td><span class="badge badge-lime">{{ a.platform.value }}</span></td>
                         <td class="mono">{{ proxyHost }}</td>
                         <td class="mono">{{ a.balance is not null ? a.balance|number_format(0, '.', ' ') : '—' }}</td>
+                        <td>
+                            {% if a.loginStatus.value == 'ok' %}
+                                <span class="badge badge-ok" title="{{ a.lastLoginAt ? a.lastLoginAt|date('d.m.Y H:i') : '' }}">залогинен</span>
+                            {% elseif a.loginStatus.value == 'failed' %}
+                                <span class="badge badge-err" title="{{ a.lastLoginError }}">ошибка</span>
+                            {% elseif a.loginStatus.value == 'expired' %}
+                                <span class="badge badge-warn" title="{{ a.lastLoginError }}">истекла</span>
+                            {% else %}
+                                <span class="badge badge-mute">не проверен</span>
+                            {% endif %}
+                            {% if a.lastLoginAt %}
+                                <div class="mono" style="font-size:.7rem;opacity:.6;margin-top:.2rem">{{ a.lastLoginAt|date('d.m H:i') }}</div>
+                            {% endif %}
+                        </td>
                         <td>
                             {% if a.active %}
                                 <span class="badge badge-ok">active</span>

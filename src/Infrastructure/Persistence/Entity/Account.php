@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Persistence\Entity;
 
+use App\Domain\Transfer\Enum\LoginStatus;
 use App\Domain\Transfer\Enum\Platform;
 use App\Infrastructure\Persistence\Repository\AccountRepository;
 use Doctrine\DBAL\Types\Types;
@@ -51,6 +52,15 @@ class Account
 
     #[ORM\Column(name: 'is_active', type: Types::BOOLEAN, options: ['default' => true])]
     private bool $isActive = true;
+
+    #[ORM\Column(name: 'login_status', length: 16, enumType: LoginStatus::class, options: ['default' => 'unknown'])]
+    private LoginStatus $loginStatus = LoginStatus::Unknown;
+
+    #[ORM\Column(name: 'last_login_at', type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $lastLoginAt = null;
+
+    #[ORM\Column(name: 'last_login_error', type: Types::TEXT, nullable: true)]
+    private ?string $lastLoginError = null;
 
     #[ORM\Column(name: 'created_at', type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
@@ -120,6 +130,45 @@ class Account
     public function isActive(): bool
     {
         return $this->isActive;
+    }
+
+    public function getLoginStatus(): LoginStatus
+    {
+        return $this->loginStatus;
+    }
+
+    public function getLastLoginAt(): ?\DateTimeImmutable
+    {
+        return $this->lastLoginAt;
+    }
+
+    public function getLastLoginError(): ?string
+    {
+        return $this->lastLoginError;
+    }
+
+    public function markLoginOk(): void
+    {
+        $this->loginStatus = LoginStatus::Ok;
+        $this->lastLoginAt = new \DateTimeImmutable();
+        $this->lastLoginError = null;
+        $this->updatedAt = $this->lastLoginAt;
+    }
+
+    public function markLoginFailed(string $error): void
+    {
+        $this->loginStatus = LoginStatus::Failed;
+        $this->lastLoginAt = new \DateTimeImmutable();
+        $this->lastLoginError = mb_substr($error, 0, 2000);
+        $this->updatedAt = $this->lastLoginAt;
+    }
+
+    public function markSessionExpired(?string $error = null): void
+    {
+        $this->loginStatus = LoginStatus::Expired;
+        $this->lastLoginAt = new \DateTimeImmutable();
+        $this->lastLoginError = $error !== null ? mb_substr($error, 0, 2000) : null;
+        $this->updatedAt = $this->lastLoginAt;
     }
 
     public function setCredentials(?string $password, ?string $totpSecret, ?string $proxyUrl): void

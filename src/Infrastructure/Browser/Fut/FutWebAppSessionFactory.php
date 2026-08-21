@@ -8,6 +8,7 @@ use App\Infrastructure\Browser\BrowserProfileSnapshotStorage;
 use App\Infrastructure\Browser\StealthChromeClientFactory;
 use App\Infrastructure\Persistence\Entity\Account;
 use App\Infrastructure\Persistence\Repository\AccountRepository;
+use Doctrine\ORM\EntityManagerInterface;
 
 final class FutWebAppSessionFactory
 {
@@ -15,6 +16,7 @@ final class FutWebAppSessionFactory
         private readonly StealthChromeClientFactory $browserFactory,
         private readonly BrowserProfileSnapshotStorage $profileStorage,
         private readonly AccountRepository $accountRepository,
+        private readonly EntityManagerInterface $entityManager,
     ) {
     }
 
@@ -27,9 +29,19 @@ final class FutWebAppSessionFactory
      */
     public function withAccount(Account $account, callable $callback): mixed
     {
-        $session = FutWebAppSession::open($this->browserFactory, $this->profileStorage, $account);
+        try {
+            $session = FutWebAppSession::open($this->browserFactory, $this->profileStorage, $account);
+        } catch (\Throwable $e) {
+            $account->markSessionExpired($e->getMessage());
+            $this->entityManager->flush();
+
+            throw $e;
+        }
 
         try {
+            $account->markLoginOk();
+            $this->entityManager->flush();
+
             return $callback($session);
         } finally {
             $session->close();

@@ -40,22 +40,41 @@ final class LoginAccountHandler
         }
 
         $this->logger->info('LoginAccount: starting', ['email' => $account->getEmail()]);
-        $this->loginService->ensureLoggedIn($account);
 
         try {
-            $balance = $this->sessionFactory->withAccount($account, function ($session) {
-                return $this->marketBrowser->getCoins($session);
-            });
+            $this->loginService->ensureLoggedIn($account);
 
-            if ($balance !== null) {
-                $account->setBalance($balance);
-                $this->entityManager->flush();
-                $this->logger->info('LoginAccount: balance updated', ['email' => $account->getEmail(), 'balance' => $balance]);
+            try {
+                $balance = $this->sessionFactory->withAccount($account, function ($session) {
+                    return $this->marketBrowser->getCoins($session);
+                });
+
+                if ($balance !== null) {
+                    $account->setBalance($balance);
+                    $this->logger->info('LoginAccount: balance updated', [
+                        'email' => $account->getEmail(),
+                        'balance' => $balance,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                $this->logger->warning('LoginAccount: could not fetch balance', [
+                    'email' => $account->getEmail(),
+                    'error' => $e->getMessage(),
+                ]);
             }
-        } catch (\Throwable $e) {
-            $this->logger->warning('LoginAccount: could not fetch balance', ['email' => $account->getEmail(), 'error' => $e->getMessage()]);
-        }
 
-        $this->logger->info('LoginAccount: done', ['email' => $account->getEmail()]);
+            $account->markLoginOk();
+            $this->entityManager->flush();
+            $this->logger->info('LoginAccount: done', ['email' => $account->getEmail()]);
+        } catch (\Throwable $e) {
+            $account->markLoginFailed($e->getMessage());
+            $this->entityManager->flush();
+            $this->logger->error('LoginAccount: failed', [
+                'email' => $account->getEmail(),
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
     }
 }
