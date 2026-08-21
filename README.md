@@ -103,15 +103,24 @@ docker compose down
 docker compose up -d
 ```
 
-Если ошибка остаётся на старой версии compose-файлов, временно смените порты в `.env`:
+### 500: Unable to create …/var/cache/prod/http_cache
 
-```env
-MINIO_API_PORT=9010
-MINIO_CONSOLE_PORT=9011
-```
+Права на `var/` больше не должны слетать: каталог `var/` — отдельный Docker volume `app_var`, а entrypoint при каждом старте делает `chmod a+rwX`.
 
-Узнать, кто занял 9000:
+После обновления кода один раз:
 
 ```bash
-sudo ss -tlnp | grep ':9000'
+git pull
+docker compose up -d --force-recreate php worker init
+docker compose exec php php bin/console doctrine:migrations:migrate --no-interaction
 ```
+
+Логи на хосте в `./var/log` больше не появятся — смотрите внутри контейнера:
+
+```bash
+docker compose exec php tail -f var/log/scraping.log
+# или
+docker logs -f gameparser-worker-1
+```
+
+Browser-профили тоже живут в volume `app_var` (персистентны между рестартами).

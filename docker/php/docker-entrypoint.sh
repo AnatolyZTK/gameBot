@@ -5,11 +5,24 @@ set -e
 git config --global --add safe.directory /var/www/html 2>/dev/null || true
 git config --global --add safe.directory '*' 2>/dev/null || true
 
-mkdir -p /tmp/.chromium-0 /tmp/.chromium-33 var/browser-profiles /tmp/panther-error-screenshots \
-    var/cache/prod/http_cache var/cache/dev var/log var/sessions
-chmod 0777 /tmp/.chromium-0 /tmp/.chromium-33 var/browser-profiles /tmp/panther-error-screenshots 2>/dev/null || true
-chmod -R 777 var/cache var/log var/sessions 2>/dev/null || true
-chown -R www-data:www-data var/browser-profiles /tmp/.chromium-33 2>/dev/null || true
+# var/ — Docker volume (app_var). Всегда выравниваем права под php-fpm (www-data).
+mkdir -p \
+    var/cache/prod/http_cache \
+    var/cache/dev \
+    var/log \
+    var/sessions \
+    var/browser-profiles \
+    /tmp/.chromium-0 \
+    /tmp/.chromium-33 \
+    /tmp/panther-error-screenshots
+
+# a+rwX: и root (worker/chrome), и www-data (php-fpm) могут писать
+chmod -R a+rwX var /tmp/.chromium-0 /tmp/.chromium-33 /tmp/panther-error-screenshots 2>/dev/null || true
+if command -v chown >/dev/null 2>&1; then
+    chown -R www-data:www-data var 2>/dev/null || true
+    # После chown снова открыть запись для root-worker/chrome
+    chmod -R a+rwX var 2>/dev/null || true
+fi
 
 # Dev: том ./ смонтирован с хоста — vendor часто отсутствует до первого composer install
 # На сервере init-сервис уже выполнил composer install — пропускаем

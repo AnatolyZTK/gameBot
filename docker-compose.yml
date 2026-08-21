@@ -12,6 +12,8 @@ x-php-build: &php-build
 
 x-php-volumes: &php-volumes
   - ./:/var/www/html
+  # Отдельный volume: host git/chmod больше не ломает права www-data на cache/log
+  - app_var:/var/www/html/var
   - ./docker/php/conf.d/app.ini:/usr/local/etc/php/conf.d/99-app.ini:ro
 
 x-php-environment: &php-environment
@@ -203,6 +205,7 @@ volumes:
   mysql_data:
   manticore_data:
   redis_data:
+  app_var:
 
 ###> doctrine/doctrine-bundle ###
   database_data:
