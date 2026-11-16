@@ -17,6 +17,14 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  */
 final class CrossAccountListAndSnipeService
 {
+    private const PLACEHOLDER_NAME = 'Bought card';
+
+    /** Доля выручки после налога EA (5%). */
+    private const NET_RATIO = 0.95;
+
+    /** Допустимое занижение выручки при проверке баланса. */
+    private const NET_TOLERANCE = 0.9;
+
     public function __construct(
         private FutWebAppSessionFactory $sessionFactory,
         private FutTransferMarketBrowser $marketBrowser,
@@ -80,7 +88,7 @@ final class CrossAccountListAndSnipeService
                     }
                     // Имя может быть пустым — выставим карточку с экрана покупки, имя дочитаем после
                     if (!is_string($playerName) || $playerName === '') {
-                        $playerName = 'Bought card';
+                        $playerName = self::PLACEHOLDER_NAME;
                     }
                     $resolvedPlayer = $this->playerResolver->resolveOrCreateByName($playerName);
                 } else {
@@ -120,6 +128,14 @@ final class CrossAccountListAndSnipeService
                 $playerName = $betterName;
             }
 
+            if (trim((string) $playerName) === "" || strcasecmp((string) $playerName, self::PLACEHOLDER_NAME) === 0) {
+                throw new \RuntimeException(sprintf(
+                    'Не удалось определить имя выставленной карточки — снайп отменён, чтобы не купить чужой лот. Карточка осталась в Transfer List у %s (цена %s).',
+                    $sender->getEmail(),
+                    number_format($listPrice, 0, '.', ' '),
+                ));
+            }
+
             $coinsAfter = $this->marketBrowser->getCoins($session);
             $sender->setBalance($coinsAfter);
             $this->entityManager->flush();
@@ -144,7 +160,7 @@ final class CrossAccountListAndSnipeService
 
         $receiverResult = $this->sessionFactory->withAccount($receiver, function ($session) use ($receiver, $listedPlayer, $listPrice): array {
             $coinsBefore = $this->marketBrowser->getCoins($session);
-            $sniped = $this->marketBrowser->snipePlayer($session, $listedPlayer, $receiver->getPlatform(), $listPrice);
+            $sniped = $this->marketBrowser->snipePlayer($session, $listedPlayer, $receiver->getPlatform(), $listPrice, true);
             if (!$sniped) {
                 throw new \RuntimeException(sprintf(
                     'Не удалось снайпить %s на receiver по цене %s.',
@@ -164,6 +180,8 @@ final class CrossAccountListAndSnipeService
             ];
         });
 
+        $this->assertListerReceivedCoins($sender, $senderResult['coinsAfter'] ?? null, $listPrice);
+
         return [
             'senderCoinsBefore' => $senderResult['coinsBefore'],
             'senderCoinsAfter' => $senderResult['coinsAfter'],
@@ -175,5 +193,47 @@ final class CrossAccountListAndSnipeService
             'listPrice' => $listPrice,
             'playerName' => (string) $senderResult['playerName'],
         ];
+    }
+
+    /**
+     * Проверяет, что у lister реально выросли монеты: иначе sniper купил не наш лот.
+     */
+    private function assertListerReceivedCoins(Account $lister, ?int $coinsAfterListing, int $listPrice): void
+    {
+        $finalCoins = $this->sessionFactory->withAccount(
+            $lister,
+            fn ($session): ?int => $this->marketBrowser->getCoins($session),
+        );
+
+        if ($finalCoins === null || $coinsAfterListing === null) {
+            $this->logger->warning('Не удалось проверить баланс lister после снайпа', [
+                'lister' => $lister->getEmail(),
+            ]);
+
+            return;
+        }
+
+        $expectedNet = (int) floor($listPrice * self::NET_RATIO);
+        $received = $finalCoins - $coinsAfterListing;
+
+        $lister->setBalance($finalCoins);
+        $this->entityManager->flush();
+
+        $this->logger->info('Проверка выручки lister', [
+            'lister' => $lister->getEmail(),
+            'coinsAfterListing' => $coinsAfterListing,
+            'coinsFinal' => $finalCoins,
+            'received' => $received,
+            'expectedNet' => $expectedNet,
+        ]);
+
+        if ($received < (int) floor($expectedNet * self::NET_TOLERANCE)) {
+            throw new \RuntimeException(sprintf(
+                'Монеты не дошли до %s: ожидалось ~%s, баланс вырос на %s. Вероятно, sniper купил чужой лот, либо карточка ещё в продаже.',
+                $lister->getEmail(),
+                number_format($expectedNet, 0, '.', ' '),
+                number_format($received, 0, '.', ' '),
+            ));
+        }
     }
 }

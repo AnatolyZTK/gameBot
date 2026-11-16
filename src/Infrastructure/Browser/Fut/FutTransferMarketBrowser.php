@@ -344,7 +344,26 @@ JS);
     public function readListedOrSelectedName(FutWebAppSession $session): ?string
     {
         return $this->readDetailPanelName($session)
-            ?? $this->openUnassignedAndReadFirstName($session);
+            ?? $this->openUnassignedAndReadFirstName($session)
+            ?? $this->readFirstTransferListName($session);
+    }
+
+    /**
+     * Имя первой карточки из Transfer List (там лежит только что выставленный лот).
+     */
+    private function readFirstTransferListName(FutWebAppSession $session): ?string
+    {
+        try {
+            $this->openTransferList($session);
+            if (!$this->selectFirstTransferListItem($session)) {
+                return null;
+            }
+            usleep(600_000);
+
+            return $this->readDetailPanelName($session);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public function sellForMinPrice(FutWebAppSession $session, Player $player, int $minPrice): bool
@@ -405,22 +424,34 @@ return !!listBtn;
 JS);
     }
 
-    public function snipePlayer(FutWebAppSession $session, Player $player, Platform $platform, int $maxPrice): bool
+    /**
+     * @param bool $strict строгий режим: покупаем ТОЛЬКО лот с именем игрока по точной цене.
+     *                     Без поиска «по голому BIN», без сдвига цены и без покупки первого лота —
+     *                     иначе легко купить чужую карточку за те же деньги.
+     */
+    public function snipePlayer(FutWebAppSession $session, Player $player, Platform $platform, int $maxPrice, bool $strict = false): bool
     {
+        if ($strict && !$this->isUsablePlayerName($player->getName())) {
+            $this->logger->error('Strict snipe aborted: card name is unknown', ['player' => $player->getName()]);
+
+            return false;
+        }
+
         $session->factory()->dismissBlockingOverlays($session->client());
         $this->clearUnassignedItems($session);
         $session->factory()->dismissBlockingOverlays($session->client());
         $binPrice = MathService::roundToValidBin($maxPrice);
-        $candidatePrices = array_values(array_unique([
-            $binPrice,
-            MathService::roundUpToValidBin($maxPrice),
-        ]));
+        $candidatePrices = array_values(array_unique($strict
+            ? [$binPrice]
+            : [$binPrice, MathService::roundUpToValidBin($maxPrice)]));
 
         $this->openTransferMarket($session);
 
         for ($attempt = 0; $attempt < self::SEARCH_ATTEMPTS; ++$attempt) {
             $base = $candidatePrices[$attempt % count($candidatePrices)];
-            $searchPrice = $this->shiftPriceForCacheRefresh($base, intdiv($attempt, max(1, count($candidatePrices))));
+            $searchPrice = $strict
+                ? $base
+                : $this->shiftPriceForCacheRefresh($base, intdiv($attempt, max(1, count($candidatePrices))));
 
             $this->logger->info('Snipe attempt', [
                 'player' => $player->getName(),
@@ -433,14 +464,14 @@ JS);
 
             // Имя + точный BIN надёжнее «голого» BIN (на 50k+ слишком много лотов)
             $found = $this->searchPlayer($session, $player, $searchPrice, $searchPrice)
-                || $this->searchExactBuyNow($session, $searchPrice);
+                || (!$strict && $this->searchExactBuyNow($session, $searchPrice));
 
             if (!$found) {
                 usleep(400_000);
                 continue;
             }
 
-            if ($this->buyMatchingSearchResult($session, $player, $searchPrice)) {
+            if ($this->buyMatchingSearchResult($session, $player, $searchPrice, $strict)) {
                 return true;
             }
 
@@ -453,17 +484,28 @@ JS);
     /**
      * Покупает лот из выдачи, предпочитая карточку с именем игрока.
      */
-    private function buyMatchingSearchResult(FutWebAppSession $session, Player $player, int $maxPrice): bool
+    private function buyMatchingSearchResult(FutWebAppSession $session, Player $player, int $maxPrice, bool $strict = false): bool
     {
         $client = $session->client();
         $needle = mb_strtolower($this->resolveSearchName($player->getName()));
 
         $index = (int) $client->executeScript(<<<'JS'
-const [needle] = arguments;
+const [needle, strict] = arguments;
+const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+const want = normalize(needle);
 const items = Array.from(document.querySelectorAll('.listFUTItem.has-auction-data, .listFUTItem'));
-const idx = items.findIndex((el) => (el.innerText || '').toLowerCase().includes(needle));
-return idx >= 0 ? idx : 0;
-JS, [$needle]);
+const idx = items.findIndex((el) => normalize(el.innerText).includes(want));
+return idx >= 0 ? idx : (strict ? -1 : 0);
+JS, [$needle, $strict]);
+
+        if ($strict && $index < 0) {
+            $this->logger->warning('Strict snipe: no lot with matching name, not buying', [
+                'player' => $player->getName(),
+                'maxPrice' => $maxPrice,
+            ]);
+
+            return false;
+        }
 
         $selected = (bool) $client->executeScript(<<<'JS'
 const [index] = arguments;
@@ -495,7 +537,7 @@ JS);
                     $session->factory()->dismissBlockingOverlays($session->client());
                     usleep(1_000_000);
                     if (!$this->waitAndClickBuyNow($session, 4.0)) {
-                        return $this->buyFirstSearchResult($session, $maxPrice);
+                        return $strict ? false : $this->buyFirstSearchResult($session, $maxPrice);
                     }
                     usleep(800_000);
                 }
@@ -532,7 +574,18 @@ JS);
             }
         }
 
+        if ($strict) {
+            return false;
+        }
+
         return $this->buyFirstSearchResult($session, $maxPrice);
+    }
+
+    private function isUsablePlayerName(string $name): bool
+    {
+        $name = trim($name);
+
+        return $name !== '' && strcasecmp($name, 'Bought card') !== 0;
     }
 
     private function ensureTransferSearchFiltersVisible(FutWebAppSession $session): void
